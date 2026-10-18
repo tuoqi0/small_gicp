@@ -39,7 +39,10 @@ if(BUILD_TESTS OR BUILD_EXAMPLES)
   set(BUILD_WITH_PCL ON CACHE BOOL "PCL is required" FORCE)
 endif()
 
-# Eigen is the sole mandatory dependency
+# Math kernels are shared by interface; slam_math remains standalone.
+find_package(slam_math CONFIG REQUIRED)
+
+# Eigen remains required for point storage and the unconverted registration code
 find_package(Eigen3 CONFIG)
 
 if(NOT Eigen3_FOUND)
@@ -138,6 +141,7 @@ if(BUILD_HELPER)
   )
   target_link_libraries(small_gicp PUBLIC
     Eigen3::Eigen
+    slam_math::slam_math
     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
 endif()
@@ -168,6 +172,7 @@ if(BUILD_PYTHON_BINDINGS)
   )
   target_link_libraries(small_gicp_python PUBLIC
     Eigen3::Eigen
+    slam_math::slam_math
     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
   set_target_properties(small_gicp_python PROPERTIES OUTPUT_NAME small_gicp)
@@ -202,6 +207,7 @@ if(BUILD_BENCHMARKS)
   target_link_libraries(odometry_benchmark PRIVATE
     fmt::fmt
     Eigen3::Eigen
+    slam_math::slam_math
     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
     $<TARGET_NAME_IF_EXISTS:Iridescence::Iridescence>
     $<TARGET_NAME_IF_EXISTS:TBB::tbb>
@@ -216,6 +222,7 @@ if(BUILD_BENCHMARKS)
   target_link_libraries(kdtree_benchmark PRIVATE
     fmt::fmt
     Eigen3::Eigen
+    slam_math::slam_math
     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
     $<TARGET_NAME_IF_EXISTS:TBB::tbb>
     $<TARGET_NAME_IF_EXISTS:TBB::tbbmalloc>
@@ -228,6 +235,7 @@ if(BUILD_BENCHMARKS)
   target_link_libraries(downsampling_benchmark PRIVATE
     fmt::fmt
     Eigen3::Eigen
+    slam_math::slam_math
     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
     $<TARGET_NAME_IF_EXISTS:TBB::tbb>
     $<TARGET_NAME_IF_EXISTS:TBB::tbbmalloc>

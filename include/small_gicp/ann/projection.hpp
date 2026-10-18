@@ -5,6 +5,7 @@
 #include <array>
 #include <Eigen/Core>
 #include <Eigen/Eigen>
+#include <math/symmetric_eigen3.h>
 
 namespace small_gicp {
 
@@ -86,11 +87,15 @@ public:
     const Eigen::Vector4d mean = sum_pt / sum_pt.w();
     const Eigen::Matrix4d cov = (sum_sq - mean * sum_pt.transpose()) / sum_pt.w();
 
-    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eig;
-    eig.computeDirect(cov.block<3, 3>(0, 0));
-
-    NormalProjection p;
-    Eigen::Map<Eigen::Vector3d>(p.normal.data()) = eig.eigenvectors().col(2);
+    std::array<double, 9> covariance{};
+    for (std::size_t row = 0; row < 3; ++row)
+      for (std::size_t col = 0; col < 3; ++col)
+        covariance[row * 3 + col] = cov(static_cast<int>(row), static_cast<int>(col));
+    earth::mantle::math::SymmetricEigen3 spectrum;
+    // A coordinate axis is still a valid KD-tree split if covariance is invalid.
+    NormalProjection p{{1, 0, 0}};
+    if (!earth::mantle::math::symmetricEigen3(covariance, spectrum)) return p;
+    for (std::size_t row = 0; row < 3; ++row) p.normal[row] = spectrum.vectors[row * 3 + 2];
     return p;
   }
 

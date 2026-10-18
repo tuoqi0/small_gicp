@@ -4,6 +4,7 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <math/positive_definite_solve.h>
 #include <small_gicp/util/lie.hpp>
 #include <small_gicp/ann/traits.hpp>
 #include <small_gicp/points/traits.hpp>
@@ -54,10 +55,20 @@ struct GICPFactor {
       return false;
     }
 
+    const Eigen::Matrix4d RCR = traits::cov(target, k_index) + T.matrix() * traits::cov(source, source_index) * T.matrix().transpose();
+    std::array<std::array<double, 3>, 3> covariance{}, identity{}, precision{};
+    for (std::size_t row = 0; row < 3; ++row) {
+      identity[row][row] = 1;
+      for (std::size_t col = 0; col < 3; ++col)
+        covariance[row][col] = RCR(static_cast<int>(row), static_cast<int>(col));
+    }
+    // Point covariances must be positive definite. Do not add damping here.
+    if (!earth::mantle::math::solvePositiveDefinite(covariance, identity, precision)) return false;
+    mahalanobis.setZero();
+    for (std::size_t row = 0; row < 3; ++row)
+      for (std::size_t col = 0; col < 3; ++col)
+        mahalanobis(static_cast<int>(row), static_cast<int>(col)) = precision[row][col];
     target_index = k_index;
-
-    const Eigen::Matrix4d RCR = traits::cov(target, target_index) + T.matrix() * traits::cov(source, source_index) * T.matrix().transpose();
-    mahalanobis.block<3, 3>(0, 0) = RCR.block<3, 3>(0, 0).inverse();
 
     const Eigen::Vector4d residual = traits::point(target, target_index) - transed_source_pt;
 

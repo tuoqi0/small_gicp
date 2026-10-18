@@ -3,6 +3,7 @@
 #pragma once
 
 #include <Eigen/Eigen>
+#include <math/symmetric_eigen3.h>
 #include <small_gicp/ann/kdtree.hpp>
 
 namespace small_gicp {
@@ -85,10 +86,20 @@ void estimate_local_features(PointCloud& cloud, Tree& kdtree, int num_neighbors,
   const Eigen::Vector4d mean = sum_points / n;
   const Eigen::Matrix4d cov = (sum_cross - mean * sum_points.transpose()) / n;
 
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eig;
-  eig.computeDirect(cov.block<3, 3>(0, 0));
-
-  Setter::set(cloud, point_index, eig.eigenvectors());
+  std::array<double, 9> covariance{};
+  for (int row = 0; row < 3; ++row)
+    for (int col = 0; col < 3; ++col)
+      covariance[static_cast<std::size_t>(row * 3 + col)] = cov(std::max(row, col), std::min(row, col));
+  earth::mantle::math::SymmetricEigen3 eig;
+  if (!earth::mantle::math::symmetricEigen3(covariance, eig)) {
+    Setter::set_invalid(cloud, point_index);
+    return;
+  }
+  Eigen::Matrix3d vectors;
+  for (int row = 0; row < 3; ++row)
+    for (int col = 0; col < 3; ++col)
+      vectors(row, col) = eig.vectors[static_cast<std::size_t>(row * 3 + col)];
+  Setter::set(cloud, point_index, vectors);
 }
 
 template <typename Setter, typename PointCloud, typename KdTree>
