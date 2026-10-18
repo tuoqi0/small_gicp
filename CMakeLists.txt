@@ -271,25 +271,27 @@ endif()
 ## Test ##
 ##########
 if(BUILD_TESTS)
-  find_package(GTest REQUIRED)
+  find_package(robot_core CONFIG REQUIRED)
+  include(${robot_core_DIR}/robot_coreTests.cmake)
 
   enable_testing()
   file(GLOB TEST_SOURCES "src/test/*.cpp")
   # Generate test target for each test source file
   foreach(TEST_SOURCE ${TEST_SOURCES})
     get_filename_component(TEST_NAME ${TEST_SOURCE} NAME_WE)
-    add_executable(${TEST_NAME} ${TEST_SOURCE})
-    target_link_libraries(${TEST_NAME} PRIVATE
+    robot_core_add_test(${TEST_NAME} ${TEST_SOURCE})
+    target_link_libraries(${TEST_NAME}
       small_gicp
       fmt::fmt
-      GTest::gtest_main
       TBB::tbb
       TBB::tbbmalloc
       PCL::PCL
       OpenMP::OpenMP_CXX
     )
 
-    gtest_discover_tests(${TEST_NAME} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(${TEST_NAME} PROPERTIES
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      ENVIRONMENT "OMP_NUM_THREADS=2")
 
    if(MSVC)
      set_target_properties(${TEST_NAME}

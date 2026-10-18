@@ -1,6 +1,8 @@
 #include <random>
 
-#include <gtest/gtest.h>
+#include <robot_core/test/doctest.h>
+#include <string>
+#include <cmath>
 #include <small_gicp/points/point_cloud.hpp>
 #include <small_gicp/ann/kdtree.hpp>
 #include <small_gicp/ann/kdtree_omp.hpp>
@@ -21,9 +23,10 @@ struct Problem {
   std::vector<std::vector<double>> dists;
 };
 
-class KdTreeSyntheticTest : public testing::Test, public testing::WithParamInterface<std::string> {
+class KdTreeSyntheticTest {
 public:
-  void SetUp() override {
+  KdTreeSyntheticTest() { setup(); }
+  void setup() {
     std::mt19937 mt;
 
     std::vector<Eigen::Vector4d> points(256);
@@ -176,18 +179,18 @@ public:
 
   void
   validate(const Problem::Ptr& prob, const std::vector<std::vector<size_t>>& k_indices, const std::vector<std::vector<double>>& k_sq_dists, int k, const std::string& test_name) {
-    EXPECT_EQ(k_indices.size(), prob->query->size()) << test_name;
-    EXPECT_EQ(k_sq_dists.size(), prob->query->size()) << test_name;
+    CHECK_MESSAGE((k_indices.size()) == (prob->query->size()), (test_name));
+    CHECK_MESSAGE((k_sq_dists.size()) == (prob->query->size()), (test_name));
 
     for (int i = 0; i < prob->query->size(); i++) {
       const int expected_n = std::min<int>(k, prob->target->size());
-      EXPECT_EQ(k_indices[i].size(), expected_n) << test_name;
-      EXPECT_EQ(k_sq_dists[i].size(), expected_n) << test_name;
+      CHECK_MESSAGE((k_indices[i].size()) == (expected_n), (test_name));
+      CHECK_MESSAGE((k_sq_dists[i].size()) == (expected_n), (test_name));
 
       for (int j = 0; j < expected_n; j++) {
         const double sq_dist = (prob->target->point(k_indices[i][j]) - prob->query->point(i)).squaredNorm();
-        EXPECT_NEAR(k_sq_dists[i][j], sq_dist, 1e-3) << test_name;
-        EXPECT_NEAR(k_sq_dists[i][j], prob->dists[i][j], 1e-3) << test_name;
+        CHECK_MESSAGE(std::abs(static_cast<double>(k_sq_dists[i][j]) - static_cast<double>(sq_dist)) <= (1e-3), (test_name));
+        CHECK_MESSAGE(std::abs(static_cast<double>(k_sq_dists[i][j]) - static_cast<double>(prob->dists[i][j])) <= (1e-3), (test_name));
       }
     }
   }
@@ -200,63 +203,65 @@ protected:
 };
 
 // Check if the data is synthesized correctly
-TEST_F(KdTreeSyntheticTest, LoadCheck) {
-  EXPECT_EQ(names.size(), targets.size());
-  EXPECT_NE(problems.size(), 0);
+TEST_CASE_FIXTURE(KdTreeSyntheticTest, "KdTreeSyntheticTest.LoadCheck") {
+  CHECK((names.size()) == (targets.size()));
+  CHECK((problems.size()) != (0));
 
   for (const auto& prob : problems) {
-    EXPECT_EQ(prob->indices.size(), prob->query->size());
-    EXPECT_EQ(prob->dists.size(), prob->query->size());
+    CHECK((prob->indices.size()) == (prob->query->size()));
+    CHECK((prob->dists.size()) == (prob->query->size()));
 
     for (int i = 0; i < prob->query->size(); i++) {
-      EXPECT_EQ(prob->indices[i].size(), prob->dists[i].size());
-      EXPECT_EQ(prob->indices[i].size(), std::min<int>(20, prob->target->size()));
-      EXPECT_TRUE(std::is_sorted(prob->dists[i].begin(), prob->dists[i].end()));
+      CHECK((prob->indices[i].size()) == (prob->dists[i].size()));
+      CHECK((prob->indices[i].size()) == (std::min<int>(20, prob->target->size())));
+      CHECK((std::is_sorted(prob->dists[i].begin(), prob->dists[i].end())));
     }
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(KdTreeSyntheticTest, KdTreeSyntheticTest, testing::Values("SMALL", "TBB", "OMP"), [](const auto& info) { return info.param; });
-
 // Check if kdtree works correctly
-TEST_P(KdTreeSyntheticTest, KnnTest) {
-  const auto method = GetParam();
+TEST_CASE_FIXTURE(KdTreeSyntheticTest, "KdTreeSyntheticTest.KnnTest") {
+  for (const std::string parameter : {"SMALL", "TBB", "OMP"}) {
+    SUBCASE(parameter.c_str()) {
+      const auto method = parameter;
 
-  for (const auto& prob : problems) {
-    KdTree<PointCloud>::Ptr kdtree;
-    KdTree<PointCloud, NormalProjection>::Ptr kdtree_normal;
+      for (const auto& prob : problems) {
+        KdTree<PointCloud>::Ptr kdtree;
+        KdTree<PointCloud, NormalProjection>::Ptr kdtree_normal;
 
-    if (method == "SMALL") {
-      kdtree = std::make_shared<KdTree<PointCloud>>(prob->target);
-      kdtree_normal = std::make_shared<KdTree<PointCloud, NormalProjection>>(prob->target);
-    } else if (method == "TBB") {
-      kdtree = std::make_shared<KdTree<PointCloud>>(prob->target, KdTreeBuilderTBB());
-      kdtree_normal = std::make_shared<KdTree<PointCloud, NormalProjection>>(prob->target, KdTreeBuilderTBB());
-    } else if (method == "OMP") {
-      kdtree = std::make_shared<KdTree<PointCloud>>(prob->target, KdTreeBuilderOMP());
-      kdtree_normal = std::make_shared<KdTree<PointCloud, NormalProjection>>(prob->target, KdTreeBuilderOMP());
+        if (method == "SMALL") {
+          kdtree = std::make_shared<KdTree<PointCloud>>(prob->target);
+          kdtree_normal = std::make_shared<KdTree<PointCloud, NormalProjection>>(prob->target);
+        } else if (method == "TBB") {
+          kdtree = std::make_shared<KdTree<PointCloud>>(prob->target, KdTreeBuilderTBB());
+          kdtree_normal = std::make_shared<KdTree<PointCloud, NormalProjection>>(prob->target, KdTreeBuilderTBB());
+        } else if (method == "OMP") {
+          kdtree = std::make_shared<KdTree<PointCloud>>(prob->target, KdTreeBuilderOMP());
+          kdtree_normal = std::make_shared<KdTree<PointCloud, NormalProjection>>(prob->target, KdTreeBuilderOMP());
+        }
+
+        std::vector<int> ks = {1, 2, 3, 5, 10, 20};
+        for (auto k : ks) {
+          std::stringstream test_name;
+          test_name << prob->target_name << "(" << prob->target_name << "," << prob->query_name << "," << k << ")";
+
+          const auto [k_indices, k_sq_dists] = knn_search(*kdtree, *prob->target, *prob->query, k);
+          validate(prob, k_indices, k_sq_dists, k, test_name.str());
+
+          test_name << "_normal";
+          const auto [k_indices2, k_sq_dists2] = knn_search(*kdtree_normal, *prob->target, *prob->query, k);
+          validate(prob, k_indices2, k_sq_dists2, k, test_name.str());
+        }
+
+        std::stringstream test_name;
+        test_name << prob->target_name << "(" << prob->target_name << "," << prob->query_name << ",nn)";
+        const auto [k_indices, k_sq_dists] = nearest_neighbor_search(*kdtree, *prob->target, *prob->query);
+        validate(prob, k_indices, k_sq_dists, 1, test_name.str());
+
+        test_name << "_normal";
+        const auto [k_indices2, k_sq_dists2] = nearest_neighbor_search(*kdtree_normal, *prob->target, *prob->query);
+        validate(prob, k_indices2, k_sq_dists2, 1, test_name.str());
+      }
     }
-
-    std::vector<int> ks = {1, 2, 3, 5, 10, 20};
-    for (auto k : ks) {
-      std::stringstream test_name;
-      test_name << prob->target_name << "(" << prob->target_name << "," << prob->query_name << "," << k << ")";
-
-      const auto [k_indices, k_sq_dists] = knn_search(*kdtree, *prob->target, *prob->query, k);
-      validate(prob, k_indices, k_sq_dists, k, test_name.str());
-
-      test_name << "_normal";
-      const auto [k_indices2, k_sq_dists2] = knn_search(*kdtree_normal, *prob->target, *prob->query, k);
-      validate(prob, k_indices2, k_sq_dists2, k, test_name.str());
-    }
-
-    std::stringstream test_name;
-    test_name << prob->target_name << "(" << prob->target_name << "," << prob->query_name << ",nn)";
-    const auto [k_indices, k_sq_dists] = nearest_neighbor_search(*kdtree, *prob->target, *prob->query);
-    validate(prob, k_indices, k_sq_dists, 1, test_name.str());
-
-    test_name << "_normal";
-    const auto [k_indices2, k_sq_dists2] = nearest_neighbor_search(*kdtree_normal, *prob->target, *prob->query);
-    validate(prob, k_indices2, k_sq_dists2, 1, test_name.str());
   }
 }

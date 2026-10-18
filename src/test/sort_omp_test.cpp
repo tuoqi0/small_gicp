@@ -3,7 +3,8 @@
 #include <fmt/format.h>
 #include <small_gicp/util/sort_omp.hpp>
 
-#include <gtest/gtest.h>
+#include <robot_core/test/doctest.h>
+#include <cmath>
 
 using namespace small_gicp;
 
@@ -23,7 +24,7 @@ bool identical(const std::vector<T>& arr1, const std::vector<T>& arr2) {
 }
 
 // Test merge_sort_omp
-TEST(SortOMP, MergeSortTest) {
+TEST_CASE("SortOMP.MergeSortTest") {
   std::mt19937 mt;
 
   std::uniform_int_distribution<> size_dist(0, 8192);
@@ -40,7 +41,7 @@ TEST(SortOMP, MergeSortTest) {
     std::vector<int> sorted_omp = data;
     merge_sort_omp(sorted_omp.begin(), sorted_omp.end(), std::less<int>(), 4);
 
-    EXPECT_TRUE(identical(sorted, sorted_omp)) << fmt::format("i={} N={}", i, data.size());
+    CHECK_MESSAGE((identical(sorted, sorted_omp)), (fmt::format("i={} N={}", i, data.size())));
   }
 
   // double
@@ -55,17 +56,17 @@ TEST(SortOMP, MergeSortTest) {
     std::vector<double> sorted_omp = data;
     merge_sort_omp(sorted_omp.begin(), sorted_omp.end(), std::less<double>(), 4);
 
-    EXPECT_TRUE(identical(sorted, sorted_omp)) << fmt::format("i={} N={}", i, data.size());
+    CHECK_MESSAGE((identical(sorted, sorted_omp)), (fmt::format("i={} N={}", i, data.size())));
   }
 
   // empty
   std::vector<int> empty_vector;
   merge_sort_omp(empty_vector.begin(), empty_vector.end(), std::less<int>(), 4);
-  EXPECT_TRUE(empty_vector.empty()) << "Empty vector check";
+  CHECK_MESSAGE((empty_vector.empty()), ("Empty vector check"));
 }
 
 // Test quick_sort_omp
-TEST(SortOMP, QuickSortTest) {
+TEST_CASE("SortOMP.QuickSortTest") {
   std::mt19937 mt;
 
   std::uniform_int_distribution<> size_dist(0, 8192);
@@ -82,7 +83,7 @@ TEST(SortOMP, QuickSortTest) {
     std::vector<int> sorted_omp = data;
     quick_sort_omp(sorted_omp.begin(), sorted_omp.end(), std::less<int>(), 4);
 
-    EXPECT_TRUE(identical(sorted, sorted_omp)) << fmt::format("i={} N={}", i, data.size());
+    CHECK_MESSAGE((identical(sorted, sorted_omp)), (fmt::format("i={} N={}", i, data.size())));
   }
 
   // double
@@ -97,11 +98,11 @@ TEST(SortOMP, QuickSortTest) {
     std::vector<double> sorted_omp = data;
     quick_sort_omp(sorted_omp.begin(), sorted_omp.end(), std::less<double>(), 4);
 
-    EXPECT_TRUE(identical(sorted, sorted_omp)) << fmt::format("i={} N={}", i, data.size());
+    CHECK_MESSAGE((identical(sorted, sorted_omp)), (fmt::format("i={} N={}", i, data.size())));
   }
 
   // empty
   std::vector<int> empty_vector;
   quick_sort_omp(empty_vector.begin(), empty_vector.end(), std::less<int>(), 4);
-  EXPECT_TRUE(empty_vector.empty()) << "Empty vector check";
+  CHECK_MESSAGE((empty_vector.empty()), ("Empty vector check"));
 }

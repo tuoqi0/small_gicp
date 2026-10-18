@@ -1,4 +1,5 @@
-#include <gtest/gtest.h>
+#include <robot_core/test/doctest.h>
+#include <cmath>
 
 #include <random>
 #include <small_gicp/points/point_cloud.hpp>
@@ -9,10 +10,10 @@ using namespace small_gicp;
 
 template <typename PointCloud>
 void test_points(const std::vector<Eigen::Vector4d>& src_points, PointCloud& points, std::mt19937& mt) {
-  EXPECT_EQ(traits::size(points), src_points.size());
-  EXPECT_TRUE(traits::has_points(points));
-  EXPECT_TRUE(traits::has_normals(points));
-  EXPECT_TRUE(traits::has_covs(points));
+  CHECK((traits::size(points)) == (src_points.size()));
+  CHECK((traits::has_points(points)));
+  CHECK((traits::has_normals(points)));
+  CHECK((traits::has_covs(points)));
 
   std::uniform_real_distribution<> dist(-100.0, 100.0);
   std::vector<Eigen::Vector4d> normals(src_points.size());
@@ -26,22 +27,22 @@ void test_points(const std::vector<Eigen::Vector4d>& src_points, PointCloud& poi
     traits::set_normal(points, i, normals[i]);
     traits::set_cov(points, i, covs[i]);
 
-    EXPECT_NEAR((traits::point(points, i) - src_points[i]).norm(), 0.0, 1e-3);
-    EXPECT_NEAR((traits::normal(points, i) - normals[i]).norm(), 0.0, 1e-3);
-    EXPECT_NEAR((traits::cov(points, i) - covs[i]).norm(), 0.0, 1e-3);
+    CHECK(std::abs(static_cast<double>((traits::point(points, i) - src_points[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
+    CHECK(std::abs(static_cast<double>((traits::normal(points, i) - normals[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
+    CHECK(std::abs(static_cast<double>((traits::cov(points, i) - covs[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
   }
 
   traits::resize(points, src_points.size() / 2);
-  EXPECT_EQ(traits::size(points), src_points.size() / 2);
+  CHECK((traits::size(points)) == (src_points.size() / 2));
 
   for (size_t i = 0; i < traits::size(points); i++) {
-    EXPECT_NEAR((traits::point(points, i) - src_points[i]).norm(), 0.0, 1e-3);
-    EXPECT_NEAR((traits::normal(points, i) - normals[i]).norm(), 0.0, 1e-3);
-    EXPECT_NEAR((traits::cov(points, i) - covs[i]).norm(), 0.0, 1e-3);
+    CHECK(std::abs(static_cast<double>((traits::point(points, i) - src_points[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
+    CHECK(std::abs(static_cast<double>((traits::normal(points, i) - normals[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
+    CHECK(std::abs(static_cast<double>((traits::cov(points, i) - covs[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
   }
 }
 
-TEST(PointsTest, PointsTest) {
+TEST_CASE("PointsTest.PointsTest") {
   std::mt19937 mt;
   std::uniform_real_distribution<> dist(-100.0, 100.0);
 

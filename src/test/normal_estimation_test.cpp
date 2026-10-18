@@ -1,4 +1,6 @@
-#include <gtest/gtest.h>
+#include <robot_core/test/doctest.h>
+#include <string>
+#include <cmath>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/features/normal_3d_omp.h>
@@ -15,9 +17,10 @@
 
 using namespace small_gicp;
 
-class NormalEstimationTest : public testing::Test {
+class NormalEstimationTest {
 public:
-  void SetUp() override {
+  NormalEstimationTest() { setup(); }
+  void setup() {
     points = std::make_shared<PointCloud>(read_ply("data/target.ply"));
     points = voxelgrid_sampling(*points, 0.25);
     estimate_normals_covariances(*points, num_neighbors);
@@ -44,11 +47,11 @@ public:
 
     for (size_t i = 0; i < traits::size(points); i++) {
       const Eigen::Vector4d normal = traits::normal(points, i);
-      EXPECT_NEAR(normal.w(), 0.0, 1e-6) << "Last element must be zero";
-      EXPECT_NEAR(normal.norm(), 1.0, 1e-6) << "Normal must be unit vector";
+      CHECK_MESSAGE(std::abs(static_cast<double>(normal.w()) - static_cast<double>(0.0)) <= (1e-6), ("Last element must be zero"));
+      CHECK_MESSAGE(std::abs(static_cast<double>(normal.norm()) - static_cast<double>(1.0)) <= (1e-6), ("Normal must be unit vector"));
 
       const double error = (normal - points_pcl->at(i).getNormalVector4fMap().cast<double>()).norm();
-      EXPECT_NEAR(error, 0.0, 1e-3) << "Normal estimation error is too large";
+      CHECK_MESSAGE(std::abs(static_cast<double>(error) - static_cast<double>(0.0)) <= (1e-3), ("Normal estimation error is too large"));
     }
     return true;
   }
@@ -61,17 +64,17 @@ public:
 
     for (size_t i = 0; i < traits::size(points); i++) {
       const Eigen::Matrix4d cov = traits::cov(points, i);
-      EXPECT_NEAR(cov.bottomRows(1).norm(), 0.0, 1e-6) << "Bottom row must be zero";
-      EXPECT_NEAR(cov.rightCols(1).norm(), 0.0, 1e-6) << "Right column must be zero";
+      CHECK_MESSAGE(std::abs(static_cast<double>(cov.bottomRows(1).norm()) - static_cast<double>(0.0)) <= (1e-6), ("Bottom row must be zero"));
+      CHECK_MESSAGE(std::abs(static_cast<double>(cov.rightCols(1).norm()) - static_cast<double>(0.0)) <= (1e-6), ("Right column must be zero"));
 
       for (int j = 0; j < 3; j++) {
         for (int k = j + 1; k < 3; k++) {
-          EXPECT_NEAR(cov(j, k), cov(k, j), 1e-6) << "Covariance matrix must be symmetric";
+          CHECK_MESSAGE(std::abs(static_cast<double>(cov(j, k)) - static_cast<double>(cov(k, j))) <= (1e-6), ("Covariance matrix must be symmetric"));
         }
       }
 
       const double error = (cov - this->points->cov(i)).norm();
-      EXPECT_NEAR(error, 0.0, 1e-3) << "Covariance estimation error is too large";
+      CHECK_MESSAGE(std::abs(static_cast<double>(error) - static_cast<double>(0.0)) <= (1e-3), ("Covariance estimation error is too large"));
     }
     return true;
   }
@@ -85,139 +88,139 @@ protected:
 };
 
 // Load check
-TEST_F(NormalEstimationTest, LoadCheck) {
-  EXPECT_FALSE(points->empty());
-  EXPECT_FALSE(points_pcl->empty());
+TEST_CASE_FIXTURE(NormalEstimationTest, "NormalEstimationTest.LoadCheck") {
+  CHECK(!(points->empty()));
+  CHECK(!(points_pcl->empty()));
 }
 
 // Empty test
-TEST_F(NormalEstimationTest, EmptyTest) {
+TEST_CASE_FIXTURE(NormalEstimationTest, "NormalEstimationTest.EmptyTest") {
   // Empty point cloud
   auto empty_points = std::make_shared<PointCloud>();
   auto empty_tree = std::make_shared<KdTree<PointCloud>>(empty_points);
 
   estimate_normals(*empty_points, *empty_tree, num_neighbors);
-  EXPECT_TRUE(empty_points->empty());
+  CHECK((empty_points->empty()));
   estimate_covariances(*empty_points, *empty_tree, num_neighbors);
-  EXPECT_TRUE(empty_points->empty());
+  CHECK((empty_points->empty()));
   estimate_normals_covariances(*empty_points, *empty_tree, num_neighbors);
-  EXPECT_TRUE(empty_points->empty());
+  CHECK((empty_points->empty()));
 
   // Empty point cloud (PCL)
   auto empty_points_pcl = pcl::make_shared<pcl::PointCloud<pcl::PointNormalCovariance>>();
   auto empty_tree_pcl = std::make_shared<KdTree<pcl::PointCloud<pcl::PointNormalCovariance>>>(empty_points_pcl);
 
   estimate_normals(*empty_points_pcl, *empty_tree_pcl, num_neighbors);
-  EXPECT_TRUE(empty_points_pcl->empty());
+  CHECK((empty_points_pcl->empty()));
   estimate_covariances(*empty_points_pcl, *empty_tree_pcl, num_neighbors);
-  EXPECT_TRUE(empty_points_pcl->empty());
+  CHECK((empty_points_pcl->empty()));
   estimate_normals_covariances(*empty_points_pcl, *empty_tree_pcl, num_neighbors);
-  EXPECT_TRUE(empty_points_pcl->empty());
+  CHECK((empty_points_pcl->empty()));
 }
 
 // Empty test (TBB)
-TEST_F(NormalEstimationTest, EmptyTestTBB) {
+TEST_CASE_FIXTURE(NormalEstimationTest, "NormalEstimationTest.EmptyTestTBB") {
   // Empty point cloud
   auto empty_points = std::make_shared<PointCloud>();
   auto empty_tree = std::make_shared<KdTree<PointCloud>>(empty_points);
 
   estimate_normals_tbb(*empty_points, *empty_tree, num_neighbors);
-  EXPECT_TRUE(empty_points->empty());
+  CHECK((empty_points->empty()));
   estimate_covariances_tbb(*empty_points, *empty_tree, num_neighbors);
-  EXPECT_TRUE(empty_points->empty());
+  CHECK((empty_points->empty()));
   estimate_normals_covariances_tbb(*empty_points, *empty_tree, num_neighbors);
-  EXPECT_TRUE(empty_points->empty());
+  CHECK((empty_points->empty()));
 
   // Empty point cloud (PCL)
   auto empty_points_pcl = pcl::make_shared<pcl::PointCloud<pcl::PointNormalCovariance>>();
   auto empty_tree_pcl = std::make_shared<KdTree<pcl::PointCloud<pcl::PointNormalCovariance>>>(empty_points_pcl);
 
   estimate_normals_tbb(*empty_points_pcl, *empty_tree_pcl, num_neighbors);
-  EXPECT_TRUE(empty_points_pcl->empty());
+  CHECK((empty_points_pcl->empty()));
   estimate_covariances_tbb(*empty_points_pcl, *empty_tree_pcl, num_neighbors);
-  EXPECT_TRUE(empty_points_pcl->empty());
+  CHECK((empty_points_pcl->empty()));
   estimate_normals_covariances_tbb(*empty_points_pcl, *empty_tree_pcl, num_neighbors);
-  EXPECT_TRUE(empty_points_pcl->empty());
+  CHECK((empty_points_pcl->empty()));
 }
 
 // Empty test (OMP)
-TEST_F(NormalEstimationTest, EmptyTestOMP) {
+TEST_CASE_FIXTURE(NormalEstimationTest, "NormalEstimationTest.EmptyTestOMP") {
   // Empty point cloud
   auto empty_points = std::make_shared<PointCloud>();
   auto empty_tree = std::make_shared<KdTree<PointCloud>>(empty_points);
 
   estimate_normals_omp(*empty_points, *empty_tree, num_neighbors, 2);
-  EXPECT_TRUE(empty_points->empty());
+  CHECK((empty_points->empty()));
   estimate_covariances_omp(*empty_points, *empty_tree, num_neighbors, 2);
-  EXPECT_TRUE(empty_points->empty());
+  CHECK((empty_points->empty()));
   estimate_normals_covariances_omp(*empty_points, *empty_tree, num_neighbors, 2);
-  EXPECT_TRUE(empty_points->empty());
+  CHECK((empty_points->empty()));
 
   // Empty point cloud (PCL)
   auto empty_points_pcl = pcl::make_shared<pcl::PointCloud<pcl::PointNormalCovariance>>();
   auto empty_tree_pcl = std::make_shared<KdTree<pcl::PointCloud<pcl::PointNormalCovariance>>>(empty_points_pcl);
 
   estimate_normals_omp(*empty_points_pcl, *empty_tree_pcl, num_neighbors, 2);
-  EXPECT_TRUE(empty_points_pcl->empty());
+  CHECK((empty_points_pcl->empty()));
   estimate_covariances_omp(*empty_points_pcl, *empty_tree_pcl, num_neighbors, 2);
-  EXPECT_TRUE(empty_points_pcl->empty());
+  CHECK((empty_points_pcl->empty()));
   estimate_normals_covariances_omp(*empty_points_pcl, *empty_tree_pcl, num_neighbors, 2);
-  EXPECT_TRUE(empty_points_pcl->empty());
+  CHECK((empty_points_pcl->empty()));
 }
 
 // Normal/covariance estimation test
-TEST_F(NormalEstimationTest, NormalEstimationTest) {
+TEST_CASE_FIXTURE(NormalEstimationTest, "NormalEstimationTest.NormalEstimationTest") {
   auto estimated = std::make_shared<PointCloud>();
   *estimated = *points;
 
   estimate_normals(*estimated, *tree, num_neighbors);
-  EXPECT_TRUE(check_normals(*estimated));
+  CHECK((check_normals(*estimated)));
 
   estimate_covariances(*estimated, *tree, num_neighbors);
-  EXPECT_TRUE(check_covs(*estimated));
+  CHECK((check_covs(*estimated)));
 
   *estimated = *points;
   estimate_normals_covariances(*estimated, *tree, num_neighbors);
-  EXPECT_TRUE(check_normals(*estimated));
-  EXPECT_TRUE(check_covs(*estimated));
+  CHECK((check_normals(*estimated)));
+  CHECK((check_covs(*estimated)));
 }
 
 // Normal/covariance estimation test (TBB)
-TEST_F(NormalEstimationTest, NormalEstimationTestTBB) {
+TEST_CASE_FIXTURE(NormalEstimationTest, "NormalEstimationTest.NormalEstimationTestTBB") {
   auto estimated = std::make_shared<PointCloud>();
   *estimated = *points;
 
   estimate_normals_tbb(*estimated, *tree, num_neighbors);
-  EXPECT_TRUE(check_normals(*estimated));
+  CHECK((check_normals(*estimated)));
 
   estimate_covariances_tbb(*estimated, *tree, num_neighbors);
-  EXPECT_TRUE(check_covs(*estimated));
+  CHECK((check_covs(*estimated)));
 
   *estimated = *points;
   estimate_normals_covariances_tbb(*estimated, *tree, num_neighbors);
-  EXPECT_TRUE(check_normals(*estimated));
-  EXPECT_TRUE(check_covs(*estimated));
+  CHECK((check_normals(*estimated)));
+  CHECK((check_covs(*estimated)));
 }
 
 // Normal/covariance estimation test (OMP)
-TEST_F(NormalEstimationTest, NormalEstimationTestOMP) {
+TEST_CASE_FIXTURE(NormalEstimationTest, "NormalEstimationTest.NormalEstimationTestOMP") {
   auto estimated = std::make_shared<PointCloud>();
   *estimated = *points;
 
   estimate_normals_omp(*estimated, *tree, num_neighbors, 2);
-  EXPECT_TRUE(check_normals(*estimated));
+  CHECK((check_normals(*estimated)));
 
   estimate_covariances_omp(*estimated, *tree, num_neighbors, 2);
-  EXPECT_TRUE(check_covs(*estimated));
+  CHECK((check_covs(*estimated)));
 
   *estimated = *points;
   estimate_normals_covariances_omp(*estimated, *tree, num_neighbors, 2);
-  EXPECT_TRUE(check_normals(*estimated));
-  EXPECT_TRUE(check_covs(*estimated));
+  CHECK((check_normals(*estimated)));
+  CHECK((check_covs(*estimated)));
 }
 
 // Normal/covariance estimation test (PCL)
-TEST_F(NormalEstimationTest, NormalEstimationTestPCL) {
+TEST_CASE_FIXTURE(NormalEstimationTest, "NormalEstimationTest.NormalEstimationTestPCL") {
   const auto copy_points = [&](auto& points) {
     points.resize(points_pcl->size());
     for (size_t i = 0; i < points_pcl->size(); i++) {
@@ -230,34 +233,34 @@ TEST_F(NormalEstimationTest, NormalEstimationTestPCL) {
   copy_points(*point_normals);
 
   estimate_normals(*point_normals, num_neighbors);
-  EXPECT_TRUE(check_normals(*point_normals));
+  CHECK((check_normals(*point_normals)));
   estimate_normals_tbb(*point_normals, num_neighbors);
-  EXPECT_TRUE(check_normals(*point_normals));
+  CHECK((check_normals(*point_normals)));
   estimate_normals_omp(*point_normals, num_neighbors, 2);
-  EXPECT_TRUE(check_normals(*point_normals));
+  CHECK((check_normals(*point_normals)));
 
   // Covariance estimation
   auto point_covs = pcl::make_shared<pcl::PointCloud<pcl::PointCovariance>>();
   copy_points(*point_covs);
 
   estimate_covariances(*point_covs, num_neighbors);
-  EXPECT_TRUE(check_covs(*point_covs));
+  CHECK((check_covs(*point_covs)));
   estimate_covariances_tbb(*point_covs, num_neighbors);
-  EXPECT_TRUE(check_covs(*point_covs));
+  CHECK((check_covs(*point_covs)));
   estimate_covariances_omp(*point_covs, num_neighbors, 2);
-  EXPECT_TRUE(check_covs(*point_covs));
+  CHECK((check_covs(*point_covs)));
 
   // Normal/covariance estimation
   auto point_normals_covs = pcl::make_shared<pcl::PointCloud<pcl::PointNormalCovariance>>();
   copy_points(*point_normals_covs);
 
   estimate_normals_covariances(*point_normals_covs, num_neighbors);
-  EXPECT_TRUE(check_normals(*point_normals_covs));
-  EXPECT_TRUE(check_covs(*point_normals_covs));
+  CHECK((check_normals(*point_normals_covs)));
+  CHECK((check_covs(*point_normals_covs)));
   estimate_normals_covariances_tbb(*point_normals_covs, num_neighbors);
-  EXPECT_TRUE(check_normals(*point_normals_covs));
-  EXPECT_TRUE(check_covs(*point_normals_covs));
+  CHECK((check_normals(*point_normals_covs)));
+  CHECK((check_covs(*point_normals_covs)));
   estimate_normals_covariances_omp(*point_normals_covs, num_neighbors, 2);
-  EXPECT_TRUE(check_normals(*point_normals_covs));
-  EXPECT_TRUE(check_covs(*point_normals_covs));
+  CHECK((check_normals(*point_normals_covs)));
+  CHECK((check_covs(*point_normals_covs)));
 }

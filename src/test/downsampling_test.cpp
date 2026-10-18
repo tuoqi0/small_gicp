@@ -1,6 +1,8 @@
 #include <unordered_set>
 
-#include <gtest/gtest.h>
+#include <robot_core/test/doctest.h>
+#include <string>
+#include <cmath>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/filters/voxel_grid.h>
@@ -15,9 +17,11 @@
 
 using namespace small_gicp;
 
-class DownsamplingTest : public testing::Test, public testing::WithParamInterface<std::string> {
+class DownsamplingTest {
 public:
-  void SetUp() override {
+  std::string selected_method_;
+  DownsamplingTest() { setup(); }
+  void setup() {
     // Load points
     auto points_4f = read_ply("data/target.ply");
     points = std::make_shared<PointCloud>(points_4f);
@@ -43,7 +47,7 @@ public:
   // Apply downsampling
   template <typename PointCloud>
   std::shared_ptr<PointCloud> downsample(const PointCloud& points, double resolution) {
-    const std::string method = GetParam();
+    const std::string method = selected_method_;
     if (method == "SMALL") {
       return voxelgrid_sampling(points, resolution);
     } else if (method == "TBB") {
@@ -63,75 +67,93 @@ protected:
 };
 
 // Load check
-TEST_F(DownsamplingTest, LoadCheck) {
-  EXPECT_FALSE(points->empty());
-  EXPECT_FALSE(points_pcl->empty());
+TEST_CASE_FIXTURE(DownsamplingTest, "DownsamplingTest.LoadCheck") {
+  CHECK(!(points->empty()));
+  CHECK(!(points_pcl->empty()));
   for (auto downsampled : downsampled_pcl) {
-    EXPECT_FALSE(downsampled->empty());
+    CHECK(!(downsampled->empty()));
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(DownsamplingTest, DownsamplingTest, testing::Values("SMALL", "TBB", "OMP"), [](const auto& info) { return info.param; });
-
 // Check if downsampling works correctly for empty points
-TEST_P(DownsamplingTest, EmptyTest) {
-  auto empty_points = std::make_shared<PointCloud>();
-  auto empty_downsampled = downsample(*empty_points, 0.1);
-  EXPECT_TRUE(empty_downsampled);
-  EXPECT_EQ(empty_downsampled->size(), 0) << "Empty test small: " + GetParam();
+TEST_CASE_FIXTURE(DownsamplingTest, "DownsamplingTest.EmptyTest") {
+  for (const std::string parameter : {"SMALL", "TBB", "OMP"}) {
+    SUBCASE(parameter.c_str()) {
+      selected_method_ = parameter;
+      auto empty_points = std::make_shared<PointCloud>();
+      auto empty_downsampled = downsample(*empty_points, 0.1);
+      CHECK((empty_downsampled));
+      CHECK_MESSAGE((empty_downsampled->size()) == (0), ("Empty test small: " + parameter));
 
-  auto empty_points_pcl = pcl::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
-  auto empty_downsampled_pcl = downsample(*empty_points_pcl, 0.1);
-  EXPECT_TRUE(empty_downsampled_pcl);
-  EXPECT_EQ(empty_downsampled_pcl->size(), 0) << "Empty test pcl: " + GetParam();
+      auto empty_points_pcl = pcl::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+      auto empty_downsampled_pcl = downsample(*empty_points_pcl, 0.1);
+      CHECK((empty_downsampled_pcl));
+      CHECK_MESSAGE((empty_downsampled_pcl->size()) == (0), ("Empty test pcl: " + parameter));
+    }
+  }
 }
 
 // Check if downsampling results are mostly identical to those of pcl::VoxelGrid
-TEST_P(DownsamplingTest, DownsampleTest) {
-  for (size_t i = 0; i < resolutions.size(); i++) {
-    auto result = downsample(*points, resolutions[i]);
-    EXPECT_LT(std::abs(1.0 - static_cast<double>(result->size()) / downsampled_pcl[i]->size()), 0.9) << "Downsampled size check (small): " + GetParam();
-    auto result_pcl = downsample(*points_pcl, resolutions[i]);
-    EXPECT_LT(std::abs(1.0 - static_cast<double>(result_pcl->size()) / downsampled_pcl[i]->size()), 0.9) << "Downsampled size check (pcl): " + GetParam();
-    EXPECT_EQ(result->size(), result_pcl->size()) << "Size check (small vs pcl): " + GetParam();
+TEST_CASE_FIXTURE(DownsamplingTest, "DownsamplingTest.DownsampleTest") {
+  for (const std::string parameter : {"SMALL", "TBB", "OMP"}) {
+    SUBCASE(parameter.c_str()) {
+      selected_method_ = parameter;
+      for (size_t i = 0; i < resolutions.size(); i++) {
+        auto result = downsample(*points, resolutions[i]);
+        CHECK_MESSAGE((std::abs(1.0 - static_cast<double>(result->size()) / downsampled_pcl[i]->size())) < (0.9), ("Downsampled size check (small): " + parameter));
+        auto result_pcl = downsample(*points_pcl, resolutions[i]);
+        CHECK_MESSAGE((std::abs(1.0 - static_cast<double>(result_pcl->size()) / downsampled_pcl[i]->size())) < (0.9), ("Downsampled size check (pcl): " + parameter));
+        CHECK_MESSAGE((result->size()) == (result_pcl->size()), ("Size check (small vs pcl): " + parameter));
+      }
+    }
   }
 }
 
 // Check if random sampling works correctly for empty points
-TEST_P(DownsamplingTest, EmptyRandamSamplingTest) {
-  std::mt19937 mt;
+TEST_CASE_FIXTURE(DownsamplingTest, "DownsamplingTest.EmptyRandamSamplingTest") {
+  for (const std::string parameter : {"SMALL", "TBB", "OMP"}) {
+    SUBCASE(parameter.c_str()) {
+      selected_method_ = parameter;
+      std::mt19937 mt;
 
-  auto empty_points = std::make_shared<PointCloud>();
-  auto empty_downsampled = random_sampling(*empty_points, 1000, mt);
-  EXPECT_TRUE(empty_downsampled);
-  EXPECT_EQ(empty_downsampled->size(), 0) << "Empty test small: " + GetParam();
+      auto empty_points = std::make_shared<PointCloud>();
+      auto empty_downsampled = random_sampling(*empty_points, 1000, mt);
+      CHECK((empty_downsampled));
+      CHECK_MESSAGE((empty_downsampled->size()) == (0), ("Empty test small: " + parameter));
 
-  auto empty_points_pcl = pcl::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
-  auto empty_downsampled_pcl = random_sampling(*empty_points_pcl, 1000, mt);
-  EXPECT_TRUE(empty_downsampled_pcl);
-  EXPECT_EQ(empty_downsampled_pcl->size(), 0) << "Empty test pcl: " + GetParam();
+      auto empty_points_pcl = pcl::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+      auto empty_downsampled_pcl = random_sampling(*empty_points_pcl, 1000, mt);
+      CHECK((empty_downsampled_pcl));
+      CHECK_MESSAGE((empty_downsampled_pcl->size()) == (0), ("Empty test pcl: " + parameter));
+    }
+  }
 }
 
 // Test random sampling
-TEST_P(DownsamplingTest, RandamSamplingTest) {
-  std::mt19937 mt;
+TEST_CASE_FIXTURE(DownsamplingTest, "DownsamplingTest.RandamSamplingTest") {
+  for (const std::string parameter : {"SMALL", "TBB", "OMP"}) {
+    SUBCASE(parameter.c_str()) {
+      selected_method_ = parameter;
+      std::mt19937 mt;
 
-  auto downsampled = voxelgrid_sampling(*points, 0.1);
+      auto downsampled = voxelgrid_sampling(*points, 0.1);
 
-  const std::vector<size_t> num_points = {0, 100, 1000};
-  for (size_t N : num_points) {
-    auto result = random_sampling(*downsampled, N, mt);
-    EXPECT_TRUE(result);
-    EXPECT_EQ(result->size(), N) << "Size check (small): " + GetParam();
+      const std::vector<size_t> num_points = {0, 100, 1000};
+      for (size_t N : num_points) {
+        auto result = random_sampling(*downsampled, N, mt);
+        CHECK((result));
+        CHECK_MESSAGE((result->size()) == (N), ("Size check (small): " + parameter));
 
-    std::unordered_set<size_t> indices;
-    for (size_t i = 0; i < N; i++) {
-      const auto found = std::find_if(downsampled->points.begin(), downsampled->points.end(), [&](const auto& p) { return (p - result->points[i]).norm() < 1.0e-6; });
-      EXPECT_NE(found, downsampled->points.end()) << "Existence check (small): " + GetParam();
+        std::unordered_set<size_t> indices;
+        for (size_t i = 0; i < N; i++) {
+          const auto found = std::find_if(downsampled->points.begin(), downsampled->points.end(), [&](const auto& p) { return (p - result->points[i]).norm() < 1.0e-6; });
+          CHECK_MESSAGE((found) != (downsampled->points.end()), ("Existence check (small): " + parameter));
 
-      const size_t index = std::distance(downsampled->points.begin(), found);
-      EXPECT_EQ(indices.count(index), 0) << "Uniqueness check (small): " + GetParam();
-      indices.insert(index);
+          const size_t index = std::distance(downsampled->points.begin(), found);
+          CHECK_MESSAGE((indices.count(index)) == (0), ("Uniqueness check (small): " + parameter));
+          indices.insert(index);
+        }
+      }
     }
   }
 }

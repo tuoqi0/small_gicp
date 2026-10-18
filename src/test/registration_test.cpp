@@ -1,4 +1,6 @@
-#include <gtest/gtest.h>
+#include <robot_core/test/doctest.h>
+#include <string>
+#include <cmath>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <small_gicp/util/downsampling.hpp>
@@ -22,9 +24,10 @@
 
 using namespace small_gicp;
 
-class RegistrationTest : public testing::Test, public testing::WithParamInterface<std::tuple<const char*, const char*>> {
+class RegistrationTest {
 public:
-  void SetUp() override {
+  RegistrationTest() { setup(); }
+  void setup() {
     // Load points
     const double downsampling_resolution = 0.3;
 
@@ -100,21 +103,21 @@ public:
   void test_registration(Registration& registration) {
     for (int i = 0; i < T_noise.size(); i++) {
       auto result = registration.align(*target, *source, *target_tree, T_noise[i]);
-      EXPECT_TRUE(compare_transformation(T_target_source, result.T_target_source)) << "Forward transformation T_noise=" << i;
+      CHECK_MESSAGE((compare_transformation(T_target_source, result.T_target_source)), ("Forward transformation T_noise="), (i));
 
       result = registration.align(*target_pcl, *source_pcl, *target_tree, T_noise[i]);
-      EXPECT_TRUE(compare_transformation(T_target_source, result.T_target_source)) << "Forward transformation (pcl) T_noise=" << i;
+      CHECK_MESSAGE((compare_transformation(T_target_source, result.T_target_source)), ("Forward transformation (pcl) T_noise="), (i));
 
       result = registration.align(*source, *target, *source_tree, T_noise[i]);
-      EXPECT_TRUE(compare_transformation(T_target_source.inverse(), result.T_target_source)) << "Inverse transformation T_noise=" << i;
+      CHECK_MESSAGE((compare_transformation(T_target_source.inverse(), result.T_target_source)), ("Inverse transformation T_noise="), (i));
 
       result = registration.align(*source_pcl, *target_pcl, *source_tree, T_noise[i]);
-      EXPECT_TRUE(compare_transformation(T_target_source.inverse(), result.T_target_source)) << "Inverse transformation (pcl) T_noise=" << i;
+      CHECK_MESSAGE((compare_transformation(T_target_source.inverse(), result.T_target_source)), ("Inverse transformation (pcl) T_noise="), (i));
 
       for (int j = 0; j < T_source_shifted.size(); j++) {
         const Eigen::Isometry3d T_target_shifted = T_target_source * T_source_shifted[j];
         auto result = registration.align(*target, *shifted[j], *target_tree, T_source_shifted[j] * T_noise[i]);
-        EXPECT_TRUE(compare_transformation(T_target_shifted, result.T_target_source)) << "Forward transformation T_source_shifted=" << j << " T_noise=" << i;
+        CHECK_MESSAGE((compare_transformation(T_target_shifted, result.T_target_source)), ("Forward transformation T_source_shifted="), (j), (" T_noise="), (i));
       }
     }
   }
@@ -123,15 +126,15 @@ public:
   void test_registration_vgicp(Registration& registration) {
     for (int i = 0; i < T_noise.size(); i++) {
       auto result = registration.align(*target_voxelmap, *source, *target_voxelmap, T_noise[i]);
-      EXPECT_TRUE(compare_transformation(T_target_source, result.T_target_source)) << "Forward transformation T_noise=" << i;
+      CHECK_MESSAGE((compare_transformation(T_target_source, result.T_target_source)), ("Forward transformation T_noise="), (i));
 
       result = registration.align(*source_voxelmap, *target, *source_voxelmap, T_noise[i]);
-      EXPECT_TRUE(compare_transformation(T_target_source.inverse(), result.T_target_source)) << "Inverse transformation T_noise=" << i;
+      CHECK_MESSAGE((compare_transformation(T_target_source.inverse(), result.T_target_source)), ("Inverse transformation T_noise="), (i));
 
       for (int j = 0; j < T_source_shifted.size(); j++) {
         const Eigen::Isometry3d T_target_shifted = T_target_source * T_source_shifted[j];
         auto result = registration.align(*target_voxelmap, *shifted[j], *target_voxelmap, T_source_shifted[j] * T_noise[i]);
-        EXPECT_TRUE(compare_transformation(T_target_shifted, result.T_target_source)) << "Forward transformation T_source_shifted=" << j << " T_noise=" << i;
+        CHECK_MESSAGE((compare_transformation(T_target_shifted, result.T_target_source)), ("Forward transformation T_source_shifted="), (j), (" T_noise="), (i));
       }
     }
   }
@@ -144,8 +147,8 @@ public:
     const double rot_tol = 2.5 * M_PI / 180.0;
     const double trans_tol = 0.2;
 
-    EXPECT_NEAR(error_rot, 0.0, rot_tol);
-    EXPECT_NEAR(error_trans, 0.0, trans_tol);
+    CHECK(std::abs(static_cast<double>(error_rot) - static_cast<double>(0.0)) <= (rot_tol));
+    CHECK(std::abs(static_cast<double>(error_trans) - static_cast<double>(0.0)) <= (trans_tol));
 
     return error_rot < rot_tol && error_trans < trans_tol;
   }
@@ -169,15 +172,15 @@ protected:
 };
 
 // Load check
-TEST_F(RegistrationTest, LoadCheck) {
-  EXPECT_FALSE(target->empty());
-  EXPECT_FALSE(source->empty());
-  EXPECT_FALSE(target_pcl->empty());
-  EXPECT_FALSE(source_pcl->empty());
+TEST_CASE_FIXTURE(RegistrationTest, "RegistrationTest.LoadCheck") {
+  CHECK(!(target->empty()));
+  CHECK(!(source->empty()));
+  CHECK(!(target_pcl->empty()));
+  CHECK(!(source_pcl->empty()));
 }
 
 // PCL interface test
-TEST_F(RegistrationTest, PCLInterfaceTest) {
+TEST_CASE_FIXTURE(RegistrationTest, "RegistrationTest.PCLInterfaceTest") {
   RegistrationPCL<pcl::PointNormalCovariance, pcl::PointNormalCovariance> registration;
   registration.setNumThreads(2);
   registration.setCorrespondenceRandomness(20);
@@ -193,15 +196,15 @@ TEST_F(RegistrationTest, PCLInterfaceTest) {
   pcl::PointCloud<pcl::PointNormalCovariance> aligned;
   registration.align(aligned);
 
-  EXPECT_EQ(aligned.size(), source_pcl->size());
-  EXPECT_TRUE(compare_transformation(T_target_source, Eigen::Isometry3d(registration.getFinalTransformation().cast<double>())));
+  CHECK((aligned.size()) == (source_pcl->size()));
+  CHECK((compare_transformation(T_target_source, Eigen::Isometry3d(registration.getFinalTransformation().cast<double>()))));
 
   // Swap and backward align
   registration.swapSourceAndTarget();
   registration.align(aligned);
 
-  EXPECT_EQ(aligned.size(), target_pcl->size());
-  EXPECT_TRUE(compare_transformation(T_target_source.inverse(), Eigen::Isometry3d(registration.getFinalTransformation().cast<double>())));
+  CHECK((aligned.size()) == (target_pcl->size()));
+  CHECK((compare_transformation(T_target_source.inverse(), Eigen::Isometry3d(registration.getFinalTransformation().cast<double>()))));
 
   // Clear and forward align
   registration.clearTarget();
@@ -211,15 +214,15 @@ TEST_F(RegistrationTest, PCLInterfaceTest) {
   registration.setInputSource(source_pcl);
   registration.align(aligned);
 
-  EXPECT_EQ(aligned.size(), source_pcl->size());
-  EXPECT_TRUE(compare_transformation(T_target_source, Eigen::Isometry3d(registration.getFinalTransformation().cast<double>())));
+  CHECK((aligned.size()) == (source_pcl->size()));
+  CHECK((compare_transformation(T_target_source, Eigen::Isometry3d(registration.getFinalTransformation().cast<double>()))));
 
   Eigen::Matrix<double, 6, 6> H = registration.getFinalHessian();
   Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, 6, 6>> eig(H);
-  EXPECT_GT(eig.eigenvalues()[0], 10.0);
+  CHECK((eig.eigenvalues()[0]) > (10.0));
   for (int i = 0; i < 6; i++) {
     for (int j = i + 1; j < 6; j++) {
-      EXPECT_NEAR(H(i, j), H(j, i), 1e-3);
+      CHECK(std::abs(static_cast<double>(H(i, j)) - static_cast<double>(H(j, i))) <= (1e-3));
     }
   }
 
@@ -232,23 +235,23 @@ TEST_F(RegistrationTest, PCLInterfaceTest) {
 
   registration.align(aligned);
 
-  EXPECT_EQ(aligned.size(), source_pcl->size());
-  EXPECT_TRUE(compare_transformation(T_target_source, Eigen::Isometry3d(registration.getFinalTransformation().cast<double>())));
+  CHECK((aligned.size()) == (source_pcl->size()));
+  CHECK((compare_transformation(T_target_source, Eigen::Isometry3d(registration.getFinalTransformation().cast<double>()))));
 
   H = registration.getFinalHessian();
   eig.compute(H);
-  EXPECT_GT(eig.eigenvalues()[0], 10.0);
+  CHECK((eig.eigenvalues()[0]) > (10.0));
   for (int i = 0; i < 6; i++) {
     for (int j = i + 1; j < 6; j++) {
-      EXPECT_NEAR(H(i, j), H(j, i), 1e-3);
+      CHECK(std::abs(static_cast<double>(H(i, j)) - static_cast<double>(H(j, i))) <= (1e-3));
     }
   }
 
   // Re-use covariances
   std::vector<Eigen::Matrix4d> target_covs = registration.getTargetCovariances();
   std::vector<Eigen::Matrix4d> source_covs = registration.getSourceCovariances();
-  EXPECT_EQ(target_covs.size(), target_pcl->size());
-  EXPECT_EQ(source_covs.size(), source_pcl->size());
+  CHECK((target_covs.size()) == (target_pcl->size()));
+  CHECK((source_covs.size()) == (source_pcl->size()));
 
   registration.clearTarget();
   registration.clearSource();
@@ -259,15 +262,15 @@ TEST_F(RegistrationTest, PCLInterfaceTest) {
   registration.setSourceCovariances(source_covs);
 
   registration.align(aligned);
-  EXPECT_EQ(aligned.size(), source_pcl->size());
-  EXPECT_TRUE(compare_transformation(T_target_source, Eigen::Isometry3d(registration.getFinalTransformation().cast<double>())));
+  CHECK((aligned.size()) == (source_pcl->size()));
+  CHECK((compare_transformation(T_target_source, Eigen::Isometry3d(registration.getFinalTransformation().cast<double>()))));
 
   // Swap and backward align
   registration.swapSourceAndTarget();
   registration.align(aligned);
 
-  EXPECT_EQ(aligned.size(), target_pcl->size());
-  EXPECT_TRUE(compare_transformation(T_target_source.inverse(), Eigen::Isometry3d(registration.getFinalTransformation().cast<double>())));
+  CHECK((aligned.size()) == (target_pcl->size()));
+  CHECK((compare_transformation(T_target_source.inverse(), Eigen::Isometry3d(registration.getFinalTransformation().cast<double>()))));
 
   // Clear and forward align
   registration.clearTarget();
@@ -277,91 +280,89 @@ TEST_F(RegistrationTest, PCLInterfaceTest) {
   registration.setInputSource(source_pcl);
   registration.align(aligned);
 
-  EXPECT_EQ(aligned.size(), source_pcl->size());
-  EXPECT_TRUE(compare_transformation(T_target_source, Eigen::Isometry3d(registration.getFinalTransformation().cast<double>())));
+  CHECK((aligned.size()) == (source_pcl->size()));
+  CHECK((compare_transformation(T_target_source, Eigen::Isometry3d(registration.getFinalTransformation().cast<double>()))));
 }
 
-INSTANTIATE_TEST_SUITE_P(
-  RegistrationTest,
-  RegistrationTest,
-  testing::Combine(testing::Values("ICP", "PLANE_ICP", "GICP", "VGICP", "HUBER_GICP", "CAUCHY_GICP"), testing::Values("SERIAL", "TBB", "OMP")),
-  [](const auto& info) {
-    std::stringstream sst;
-    sst << std::get<0>(info.param) << "_" << std::get<1>(info.param);
-    return sst.str();
-  });
+TEST_CASE_FIXTURE(RegistrationTest, "RegistrationTest.RegistrationTest") {
+  for (const std::string factor_mode : {"ICP", "PLANE_ICP", "GICP", "VGICP", "HUBER_GICP", "CAUCHY_GICP"}) {
+    for (const std::string reduction_mode : {"SERIAL", "TBB", "OMP"}) {
+      const std::string label = factor_mode + "/" + reduction_mode;
+      SUBCASE(label.c_str()) {
+        const auto parameter = std::make_tuple(factor_mode.c_str(), reduction_mode.c_str());
+        const std::string factor = std::get<0>(parameter);
+        const std::string reduction = std::get<1>(parameter);
 
-TEST_P(RegistrationTest, RegistrationTest) {
-  const std::string factor = std::get<0>(GetParam());
-  const std::string reduction = std::get<1>(GetParam());
-
-  if (factor == "ICP") {
-    if (reduction == "SERIAL") {
-      Registration<ICPFactor, SerialReduction> reg;
-      test_registration(reg);
-    } else if (reduction == "TBB") {
-      Registration<ICPFactor, ParallelReductionTBB> reg;
-      test_registration(reg);
-    } else if (reduction == "OMP") {
-      Registration<ICPFactor, ParallelReductionOMP> reg;
-      test_registration(reg);
+        if (factor == "ICP") {
+          if (reduction == "SERIAL") {
+            Registration<ICPFactor, SerialReduction> reg;
+            test_registration(reg);
+          } else if (reduction == "TBB") {
+            Registration<ICPFactor, ParallelReductionTBB> reg;
+            test_registration(reg);
+          } else if (reduction == "OMP") {
+            Registration<ICPFactor, ParallelReductionOMP> reg;
+            test_registration(reg);
+          }
+        } else if (factor == "PLANE_ICP") {
+          if (reduction == "SERIAL") {
+            Registration<PointToPlaneICPFactor, SerialReduction> reg;
+            test_registration(reg);
+          } else if (reduction == "TBB") {
+            Registration<PointToPlaneICPFactor, ParallelReductionTBB> reg;
+            test_registration(reg);
+          } else if (reduction == "OMP") {
+            Registration<PointToPlaneICPFactor, ParallelReductionOMP> reg;
+            test_registration(reg);
+          }
+        } else if (factor == "GICP") {
+          if (reduction == "SERIAL") {
+            Registration<GICPFactor, SerialReduction> reg;
+            test_registration(reg);
+          } else if (reduction == "TBB") {
+            Registration<GICPFactor, ParallelReductionTBB> reg;
+            test_registration(reg);
+          } else if (reduction == "OMP") {
+            Registration<GICPFactor, ParallelReductionOMP> reg;
+            test_registration(reg);
+          }
+        } else if (factor == "VGICP") {
+          if (reduction == "SERIAL") {
+            Registration<GICPFactor, SerialReduction> reg;
+            test_registration_vgicp(reg);
+          } else if (reduction == "TBB") {
+            Registration<GICPFactor, ParallelReductionTBB> reg;
+            test_registration_vgicp(reg);
+          } else if (reduction == "OMP") {
+            Registration<GICPFactor, ParallelReductionOMP> reg;
+            test_registration_vgicp(reg);
+          }
+        } else if (factor == "HUBER_GICP") {
+          if (reduction == "SERIAL") {
+            Registration<RobustFactor<Huber, GICPFactor>, SerialReduction> reg;
+            test_registration(reg);
+          } else if (reduction == "TBB") {
+            Registration<RobustFactor<Huber, GICPFactor>, ParallelReductionTBB> reg;
+            test_registration(reg);
+          } else if (reduction == "OMP") {
+            Registration<RobustFactor<Huber, GICPFactor>, ParallelReductionOMP> reg;
+            test_registration(reg);
+          }
+        } else if (factor == "CAUCHY_GICP") {
+          if (reduction == "SERIAL") {
+            Registration<RobustFactor<Cauchy, GICPFactor>, SerialReduction> reg;
+            test_registration(reg);
+          } else if (reduction == "TBB") {
+            Registration<RobustFactor<Cauchy, GICPFactor>, ParallelReductionTBB> reg;
+            test_registration(reg);
+          } else if (reduction == "OMP") {
+            Registration<RobustFactor<Cauchy, GICPFactor>, ParallelReductionOMP> reg;
+            test_registration(reg);
+          }
+        } else {
+          CHECK_MESSAGE((false), ("error: unknown factor type "), (factor));
+        }
+      }
     }
-  } else if (factor == "PLANE_ICP") {
-    if (reduction == "SERIAL") {
-      Registration<PointToPlaneICPFactor, SerialReduction> reg;
-      test_registration(reg);
-    } else if (reduction == "TBB") {
-      Registration<PointToPlaneICPFactor, ParallelReductionTBB> reg;
-      test_registration(reg);
-    } else if (reduction == "OMP") {
-      Registration<PointToPlaneICPFactor, ParallelReductionOMP> reg;
-      test_registration(reg);
-    }
-  } else if (factor == "GICP") {
-    if (reduction == "SERIAL") {
-      Registration<GICPFactor, SerialReduction> reg;
-      test_registration(reg);
-    } else if (reduction == "TBB") {
-      Registration<GICPFactor, ParallelReductionTBB> reg;
-      test_registration(reg);
-    } else if (reduction == "OMP") {
-      Registration<GICPFactor, ParallelReductionOMP> reg;
-      test_registration(reg);
-    }
-  } else if (factor == "VGICP") {
-    if (reduction == "SERIAL") {
-      Registration<GICPFactor, SerialReduction> reg;
-      test_registration_vgicp(reg);
-    } else if (reduction == "TBB") {
-      Registration<GICPFactor, ParallelReductionTBB> reg;
-      test_registration_vgicp(reg);
-    } else if (reduction == "OMP") {
-      Registration<GICPFactor, ParallelReductionOMP> reg;
-      test_registration_vgicp(reg);
-    }
-  } else if (factor == "HUBER_GICP") {
-    if (reduction == "SERIAL") {
-      Registration<RobustFactor<Huber, GICPFactor>, SerialReduction> reg;
-      test_registration(reg);
-    } else if (reduction == "TBB") {
-      Registration<RobustFactor<Huber, GICPFactor>, ParallelReductionTBB> reg;
-      test_registration(reg);
-    } else if (reduction == "OMP") {
-      Registration<RobustFactor<Huber, GICPFactor>, ParallelReductionOMP> reg;
-      test_registration(reg);
-    }
-  } else if (factor == "CAUCHY_GICP") {
-    if (reduction == "SERIAL") {
-      Registration<RobustFactor<Cauchy, GICPFactor>, SerialReduction> reg;
-      test_registration(reg);
-    } else if (reduction == "TBB") {
-      Registration<RobustFactor<Cauchy, GICPFactor>, ParallelReductionTBB> reg;
-      test_registration(reg);
-    } else if (reduction == "OMP") {
-      Registration<RobustFactor<Cauchy, GICPFactor>, ParallelReductionOMP> reg;
-      test_registration(reg);
-    }
-  } else {
-    EXPECT_TRUE(false) << "error: unknown factor type " << factor;
   }
 }

@@ -12,6 +12,7 @@
   <depend>eigen</depend>
   <depend>slam_math</depend>
   <depend>libomp-dev</depend>
+  <test_depend>robot_core</test_depend>
 
   <!-- optional -->
   <!-- <depend>libpcl-all-dev</depend> -->

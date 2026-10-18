@@ -5,7 +5,8 @@
 #include <small_gicp/util/sort_tbb.hpp>
 #include <small_gicp/benchmark/benchmark.hpp>
 
-#include <gtest/gtest.h>
+#include <robot_core/test/doctest.h>
+#include <cmath>
 
 using namespace small_gicp;
 
@@ -38,7 +39,7 @@ void test_radix_sort(std::mt19937& mt) {
     std::vector<T> sorted_tbb = data;
     radix_sort_tbb(sorted_tbb.data(), sorted_tbb.data() + sorted_tbb.size(), [](const T x) { return x; });
 
-    EXPECT_TRUE(identical(sorted, sorted_tbb)) << fmt::format("i={} N={}", i, data.size());
+    CHECK_MESSAGE((identical(sorted, sorted_tbb)), (fmt::format("i={} N={}", i, data.size())));
   }
 
   for (int i = 0; i < 20; i++) {
@@ -51,12 +52,12 @@ void test_radix_sort(std::mt19937& mt) {
     std::vector<std::pair<T, std::uint64_t>> sorted_tbb = data;
     radix_sort_tbb(sorted_tbb.data(), sorted_tbb.data() + sorted_tbb.size(), [](const auto& x) -> T { return x.first; });
 
-    EXPECT_TRUE(identical(sorted, sorted_tbb)) << fmt::format("i={} N={}", i, data.size());
+    CHECK_MESSAGE((identical(sorted, sorted_tbb)), (fmt::format("i={} N={}", i, data.size())));
   }
 }
 
 // Test radix_sort_tbb
-TEST(SortTBB, RadixSortTest) {
+TEST_CASE("SortTBB.RadixSortTest") {
   std::mt19937 mt;
 
   test_radix_sort<std::uint8_t>(mt);
@@ -67,5 +68,5 @@ TEST(SortTBB, RadixSortTest) {
   // empty
   std::vector<std::uint64_t> empty_vector;
   radix_sort_tbb(empty_vector.data(), empty_vector.data() + empty_vector.size(), [](const std::uint64_t x) { return x; });
-  EXPECT_TRUE(empty_vector.empty()) << "Empty vector check";
+  CHECK_MESSAGE((empty_vector.empty()), ("Empty vector check"));
 }
