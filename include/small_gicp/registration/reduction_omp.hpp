@@ -3,6 +3,15 @@
 #pragma once
 
 #include <Eigen/Core>
+#include <Eigen/Geometry>
+#include <cstdint>
+#include <tuple>
+#include <vector>
+#include <math/fixed_matrix_ops.h>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 namespace small_gicp {
 
@@ -29,8 +38,11 @@ struct ParallelReductionOMP {
     const CorrespondenceRejector& rejector,
     const Eigen::Isometry3d& T,
     std::vector<Factor>& factors) const {
-    std::vector<Eigen::Matrix<double, 6, 6>> Hs(num_threads, Eigen::Matrix<double, 6, 6>::Zero());
-    std::vector<Eigen::Matrix<double, 6, 1>> bs(num_threads, Eigen::Matrix<double, 6, 1>::Zero());
+    using earth::mantle::collection::Matrix;
+    using earth::mantle::math::operator+;
+    using PackedHessian = Eigen::Matrix<double, 6, 6, Eigen::RowMajor>;
+    std::vector<Matrix<double, 6, 6>> Hs(num_threads);
+    std::vector<Matrix<double, 6, 1>> bs(num_threads);
     std::vector<double> es(num_threads, 0.0);
 
 #pragma omp parallel for num_threads(num_threads) schedule(guided, 8)
@@ -44,18 +56,20 @@ struct ParallelReductionOMP {
       }
 
       const int thread_id = omp_get_thread_num();
-      Hs[thread_id] += H;
-      bs[thread_id] += b;
+      const PackedHessian packed_H = H;
+      Hs[thread_id] = Hs[thread_id] + Matrix<double, 6, 6>::from(packed_H.data(), 36);
+      bs[thread_id] = bs[thread_id] + Matrix<double, 6, 1>::from(b.data(), 6);
       es[thread_id] += e;
     }
 
     for (int i = 1; i < num_threads; i++) {
-      Hs[0] += Hs[i];
-      bs[0] += bs[i];
+      Hs[0] = Hs[0] + Hs[i];
+      bs[0] = bs[0] + bs[i];
       es[0] += es[i];
     }
 
-    return {Hs[0], bs[0], es[0]};
+    return {Eigen::Map<const PackedHessian>(Hs[0].raw_pointer()),
+            Eigen::Map<const Eigen::Matrix<double, 6, 1>>(bs[0].raw_pointer()), es[0]};
   }
 
   template <typename TargetPointCloud, typename SourcePointCloud, typename Factor>
