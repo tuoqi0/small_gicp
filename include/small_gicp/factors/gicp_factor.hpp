@@ -41,8 +41,8 @@ struct GICPFactor {
     const Eigen::Isometry3d& T,
     size_t source_index,
     const CorrespondenceRejector& rejector,
-    Eigen::Matrix<double, 6, 6>* H,
-    Eigen::Matrix<double, 6, 1>* b,
+    factor_detail::Hessian* H,
+    factor_detail::Gradient* b,
     double* e) {
     //
     this->source_index = source_index;
@@ -81,11 +81,7 @@ struct GICPFactor {
     const Packed3 packed_rotation = T.linear();
     const auto rotation = Matrix<double, 3, 3>::from(packed_rotation.data(), 9);
     const auto jacobian = factor_detail::pointJacobian(Matrix<double, 4, 1>::from(source_point.data(), 4), rotation);
-    factor_detail::Hessian hessian{};
-    factor_detail::Gradient gradient{};
-    factor_detail::linearizeResidual(jacobian, residual, weight, hessian, gradient, *e);
-    *H = Eigen::Map<const Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>(hessian.raw_pointer());
-    *b = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(gradient.raw_pointer());
+    factor_detail::linearizeResidual(jacobian, residual, weight, *H, *b, *e);
 
     return true;
   }

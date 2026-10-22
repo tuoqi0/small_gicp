@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <cstdint>
 #include <tuple>
 #include <vector>
-#include <math/fixed_matrix_ops.h>
+#include <small_gicp/factors/linearization.hpp>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -31,7 +30,7 @@ struct ParallelReductionOMP {
   ParallelReductionOMP() : num_threads(4) {}
 
   template <typename TargetPointCloud, typename SourcePointCloud, typename TargetTree, typename CorrespondenceRejector, typename Factor>
-  std::tuple<Eigen::Matrix<double, 6, 6>, Eigen::Matrix<double, 6, 1>, double> linearize(
+  std::tuple<factor_detail::Hessian, factor_detail::Gradient, double> linearize(
     const TargetPointCloud& target,
     const SourcePointCloud& source,
     const TargetTree& target_tree,
@@ -40,15 +39,14 @@ struct ParallelReductionOMP {
     std::vector<Factor>& factors) const {
     using earth::mantle::collection::Matrix;
     using earth::mantle::math::operator+;
-    using PackedHessian = Eigen::Matrix<double, 6, 6, Eigen::RowMajor>;
     std::vector<Matrix<double, 6, 6>> Hs(num_threads);
     std::vector<Matrix<double, 6, 1>> bs(num_threads);
     std::vector<double> es(num_threads, 0.0);
 
 #pragma omp parallel for num_threads(num_threads) schedule(guided, 8)
     for (std::int64_t i = 0; i < factors.size(); i++) {
-      Eigen::Matrix<double, 6, 6> H;
-      Eigen::Matrix<double, 6, 1> b;
+      factor_detail::Hessian H{};
+      factor_detail::Gradient b{};
       double e;
 
       if (!factors[i].linearize(target, source, target_tree, T, i, rejector, &H, &b, &e)) {
@@ -56,9 +54,8 @@ struct ParallelReductionOMP {
       }
 
       const int thread_id = omp_get_thread_num();
-      const PackedHessian packed_H = H;
-      Hs[thread_id] = Hs[thread_id] + Matrix<double, 6, 6>::from(packed_H.data(), 36);
-      bs[thread_id] = bs[thread_id] + Matrix<double, 6, 1>::from(b.data(), 6);
+      Hs[thread_id] = Hs[thread_id] + H;
+      bs[thread_id] = bs[thread_id] + b;
       es[thread_id] += e;
     }
 
@@ -68,8 +65,7 @@ struct ParallelReductionOMP {
       es[0] += es[i];
     }
 
-    return {Eigen::Map<const PackedHessian>(Hs[0].raw_pointer()),
-            Eigen::Map<const Eigen::Matrix<double, 6, 1>>(bs[0].raw_pointer()), es[0]};
+    return {Hs[0], bs[0], es[0]};
   }
 
   template <typename TargetPointCloud, typename SourcePointCloud, typename Factor>

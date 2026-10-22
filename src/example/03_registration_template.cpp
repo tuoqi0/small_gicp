@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 
@@ -54,8 +55,8 @@ void example1(const std::vector<Eigen::Vector4f>& target_points, const std::vect
   std::cout << "error:" << result.error << std::endl;
   std::cout << "iterations:" << result.iterations << std::endl;
   std::cout << "num_inliers:" << result.num_inliers << std::endl;
-  std::cout << "--- H ---" << std::endl << result.H << std::endl;
-  std::cout << "--- b ---" << std::endl << result.b.transpose() << std::endl;
+  std::cout << "--- H ---" << std::endl << small_gicp::eigen_view(result.H) << std::endl;
+  std::cout << "--- b ---" << std::endl << small_gicp::eigen_view(result.b).transpose() << std::endl;
 }
 
 /** Custom registration example **/
@@ -108,7 +109,10 @@ struct Traits<MyPointCloud> {
   // Set i-th point. pt = [x, y, z, 1.0].
   static void set_point(MyPointCloud& points, size_t i, const Eigen::Vector4d& pt) { Eigen::Map<Eigen::Vector3d>(points[i].point.data()) = pt.head<3>(); }
   // Set i-th normal. n = [nx, ny, nz, 0.0].
-  static void set_normal(MyPointCloud& points, size_t i, const Eigen::Vector4d& n) { Eigen::Map<Eigen::Vector3d>(points[i].normal.data()) = n.head<3>(); }
+  template <typename Normal>
+  static void set_normal(MyPointCloud& points, size_t i, const Normal& n) {
+    points[i].normal = {{n[0], n[1], n[2]}};
+  }
   // To feed this class to estimate_covariances(), the following setter is required additionally.
   // static void set_cov(MyPointCloud& points, size_t i, const Eigen::Matrix4d& cov);
 };
@@ -228,15 +232,14 @@ struct MyGeneralFactor {
     const SourcePointCloud& source,
     const TargetTree& target_tree,
     const Eigen::Isometry3d& T,
-    Eigen::Matrix<double, 6, 6>* H,
-    Eigen::Matrix<double, 6, 1>* b,
+    small_gicp::factor_detail::Hessian* H,
+    small_gicp::factor_detail::Gradient* b,
     double* e) const {
     // Optimization DoF mask [rx, ry, rz, tx, ty, tz] (1.0 = inactive, 0.0 = active)
-    Eigen::Matrix<double, 6, 1> dof_mask;
-    dof_mask << 1.0, 1.0, 0.0, 0.0, 0.0, 0.0;
+    const std::array<double, 6> dof_mask{{1.0, 1.0, 0.0, 0.0, 0.0, 0.0}};
 
     // Fix roll and pitch rotation by adding a large penalty (soft contraint)
-    (*H) += dof_mask.asDiagonal() * lambda;
+    for (size_t axis = 0; axis < dof_mask.size(); ++axis) (*H)[axis][axis] += dof_mask[axis] * lambda;
   }
 
   /// @brief Update error consisting of per-point factors.
@@ -317,8 +320,8 @@ void example2(const std::vector<Eigen::Vector4f>& target_points, const std::vect
   std::cout << "error:" << result.error << std::endl;
   std::cout << "iterations:" << result.iterations << std::endl;
   std::cout << "num_inliers:" << result.num_inliers << std::endl;
-  std::cout << "--- H ---" << std::endl << result.H << std::endl;
-  std::cout << "--- b ---" << std::endl << result.b.transpose() << std::endl;
+  std::cout << "--- H ---" << std::endl << small_gicp::eigen_view(result.H) << std::endl;
+  std::cout << "--- b ---" << std::endl << small_gicp::eigen_view(result.b).transpose() << std::endl;
 }
 
 int main(int argc, char** argv) {

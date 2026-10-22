@@ -4,6 +4,7 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <small_gicp/factors/linearization.hpp>
 
 namespace small_gicp {
 
@@ -74,8 +75,8 @@ public:
     const Eigen::Isometry3d& T,
     size_t source_index,
     const CorrespondenceRejector& rejector,
-    Eigen::Matrix<double, 6, 6>* H,
-    Eigen::Matrix<double, 6, 1>* b,
+    factor_detail::Hessian* H,
+    factor_detail::Gradient* b,
     double* e) {
     if (!factor.linearize(target, source, target_tree, T, source_index, rejector, H, b, e)) {
       return false;
@@ -83,8 +84,9 @@ public:
 
     // Robustify the linearized factor
     const double w = robust_kernel.weight(std::sqrt(*e));
-    *H *= w;
-    *b *= w;
+    using earth::mantle::math::operator*;
+    *H = *H * w;
+    *b = *b * w;
     *e *= w;
 
     return true;

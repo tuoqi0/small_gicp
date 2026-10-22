@@ -4,32 +4,11 @@
 
 #include <iostream>
 #include <algorithm>
-#include <math/positive_definite_solve.h>
+#include <small_gicp/registration/linear_system.hpp>
 #include <small_gicp/util/lie.hpp>
 #include <small_gicp/registration/registration_result.hpp>
 
 namespace small_gicp {
-
-namespace detail {
-// Eigen's original LDLT reads the lower triangle. Keep that convention even
-// if accumulated roundoff makes the two triangles differ slightly.
-inline bool solve_damped_system(const Eigen::Matrix<double, 6, 6>& hessian,
-                                const Eigen::Matrix<double, 6, 1>& gradient,
-                                double damping, Eigen::Matrix<double, 6, 1>& delta) {
-  std::array<std::array<double, 6>, 6> matrix{};
-  std::array<double, 6> rhs{}, solution{};
-  for (std::size_t row = 0; row < 6; ++row) {
-    rhs[row] = -gradient[static_cast<int>(row)];
-    for (std::size_t col = 0; col < 6; ++col)
-      matrix[row][col] = hessian(static_cast<int>(std::max(row, col)),
-                                static_cast<int>(std::min(row, col)));
-    matrix[row][row] += damping;
-  }
-  if (!earth::mantle::math::solvePositiveDefinite(matrix, rhs, solution)) return false;
-  for (std::size_t row = 0; row < 6; ++row) delta[static_cast<int>(row)] = solution[row];
-  return true;
-}
-}  // namespace detail
 
 /// @brief GaussNewton optimizer
 struct GaussNewtonOptimizer {
@@ -66,7 +45,7 @@ struct GaussNewtonOptimizer {
       general_factor.update_linearized_system(target, source, target_tree, result.T_target_source, &H, &b, &e);
 
       // Solve linear system
-      Eigen::Matrix<double, 6, 1> delta;
+      factor_detail::Gradient delta{};
       if (!detail::solve_damped_system(H, b, lambda, delta)) {
         result.iterations = i;
         result.H = H;
@@ -76,7 +55,7 @@ struct GaussNewtonOptimizer {
       }
 
       if (verbose) {
-        std::cout << "iter=" << i << " e=" << e << " lambda=" << lambda << " dt=" << delta.tail<3>().norm() << " dr=" << delta.head<3>().norm() << std::endl;
+        std::cout << "iter=" << i << " e=" << e << " lambda=" << lambda << " dt=" << detail::translation_step_norm(delta) << " dr=" << detail::rotation_step_norm(delta) << std::endl;
       }
 
       result.converged = criteria.converged(delta);
@@ -136,7 +115,7 @@ struct LevenbergMarquardtOptimizer {
       bool success = false;
       for (int j = 0; j < max_inner_iterations; j++) {
         // Solve with damping
-        Eigen::Matrix<double, 6, 1> delta;
+        factor_detail::Gradient delta{};
         if (!detail::solve_damped_system(H, b, lambda, delta)) {
           lambda *= lambda_factor;
           continue;
@@ -148,8 +127,8 @@ struct LevenbergMarquardtOptimizer {
         general_factor.update_error(target, source, new_T, &e);
 
         if (verbose) {
-          std::cout << "iter=" << i << " inner=" << j << " e=" << e << " new_e=" << new_e << " lambda=" << lambda << " dt=" << delta.tail<3>().norm()
-                    << " dr=" << delta.head<3>().norm() << std::endl;
+          std::cout << "iter=" << i << " inner=" << j << " e=" << e << " new_e=" << new_e << " lambda=" << lambda << " dt=" << detail::translation_step_norm(delta)
+                    << " dr=" << detail::rotation_step_norm(delta) << std::endl;
         }
 
         if (new_e <= e) {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <Eigen/Core>
+#include <small_gicp/factors/linearization.hpp>
 #include <Eigen/Geometry>
 
 namespace small_gicp {
@@ -14,8 +14,8 @@ struct RegistrationResult {
     converged(false),
     iterations(0),
     num_inliers(0),
-    H(Eigen::Matrix<double, 6, 6>::Zero()),
-    b(Eigen::Matrix<double, 6, 1>::Zero()),
+    H{},
+    b{},
     error(0.0) {}
 
   Eigen::Isometry3d T_target_source;  ///<  Estimated transformation
@@ -24,8 +24,8 @@ struct RegistrationResult {
   size_t iterations;   ///< Number of optimization iterations
   size_t num_inliers;  ///< Number of inliear points
 
-  Eigen::Matrix<double, 6, 6> H;  ///< Final information matrix
-  Eigen::Matrix<double, 6, 1> b;  ///< Final information vector
+  factor_detail::Hessian H;  ///< Final information matrix
+  factor_detail::Gradient b;  ///< Final information vector
   double error;                   ///< Final error
 };
 

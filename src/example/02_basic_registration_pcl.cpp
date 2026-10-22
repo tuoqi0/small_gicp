@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 
@@ -71,8 +72,8 @@ void example2(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& raw_target, const 
   std::cout << "error:" << result.error << std::endl;
   std::cout << "iterations:" << result.iterations << std::endl;
   std::cout << "num_inliers:" << result.num_inliers << std::endl;
-  std::cout << "--- H ---" << std::endl << result.H << std::endl;
-  std::cout << "--- b ---" << std::endl << result.b.transpose() << std::endl;
+  std::cout << "--- H ---" << std::endl << small_gicp::eigen_view(result.H) << std::endl;
+  std::cout << "--- b ---" << std::endl << small_gicp::eigen_view(result.b).transpose() << std::endl;
 
   // Because this usage exposes all preprocessed data, you can easily re-use them to obtain the best efficiency.
   auto result2 = registration.align(*source, *target, *source_tree, Eigen::Isometry3d::Identity());

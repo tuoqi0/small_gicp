@@ -5,6 +5,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <math/se3_exp.h>
+#include <collection/fixed_matrix.h>
 
 namespace small_gicp {
 
@@ -66,6 +67,15 @@ inline Eigen::Isometry3d se3_exp(const Eigen::Matrix<double, 6, 1>& a) {
   Eigen::Isometry3d result = Eigen::Isometry3d::Identity();
   result.linear() = Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(
       native.rotation.data());
+  result.translation() = Eigen::Map<const Eigen::Vector3d>(native.translation.data());
+  return result;
+}
+
+// Temporary Eigen pose boundary; the optimizer increment remains native.
+inline Eigen::Isometry3d se3_exp(const earth::mantle::collection::Matrix<double, 6, 1>& a) {
+  const auto native = earth::mantle::math::se3Exp({{a[0][0], a[1][0], a[2][0], a[3][0], a[4][0], a[5][0]}});
+  Eigen::Isometry3d result = Eigen::Isometry3d::Identity();
+  result.linear() = Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(native.rotation.data());
   result.translation() = Eigen::Map<const Eigen::Vector3d>(native.translation.data());
   return result;
 }

@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 #include <robot_core/test/doctest.h>
 #include <small_gicp/util/lie.hpp>
 #include <small_gicp/factors/icp_factor.hpp>
@@ -36,24 +37,26 @@ void checkRejectedCorrespondences() {
   target.normal(0) = Eigen::Vector4d(1, 2, 3, 0);
   small_gicp::UnsafeKdTree<small_gicp::PointCloud> tree(target);
   Factor factor;
-  Eigen::Matrix<double, 6, 6> hessian;
-  Eigen::Matrix<double, 6, 1> gradient;
+  small_gicp::factor_detail::Hessian native_hessian{};
+  auto hessian = small_gicp::eigen_view(native_hessian);
+  small_gicp::factor_detail::Gradient native_gradient{};
+  auto gradient = small_gicp::eigen_view(native_gradient);
   double error = 0;
   REQUIRE(factor.linearize(target, source, tree, Eigen::Isometry3d::Identity(), 0,
-      Accept{}, &hessian, &gradient, &error));
+      Accept{}, &native_hessian, &native_gradient, &error));
   REQUIRE(factor.inlier());
   hessian.setConstant(7);
   gradient.setConstant(8);
   error = 9;
   CHECK_FALSE(factor.linearize(target, source, tree, Eigen::Isometry3d::Identity(), 0,
-      Reject{}, &hessian, &gradient, &error));
+      Reject{}, &native_hessian, &native_gradient, &error));
   CHECK_FALSE(factor.inlier());
   CHECK(factor.error(target, source, Eigen::Isometry3d::Identity()) == 0);
   CHECK((hessian.array() == 7).all());
   CHECK((gradient.array() == 8).all());
   CHECK(error == 9);
   CHECK_FALSE(factor.linearize(target, source, MissingNeighbor{}, Eigen::Isometry3d::Identity(), 0,
-      Accept{}, &hessian, &gradient, &error));
+      Accept{}, &native_hessian, &native_gradient, &error));
   CHECK_FALSE(factor.inlier());
   CHECK((hessian.array() == 7).all());
   CHECK((gradient.array() == 8).all());
@@ -101,10 +104,12 @@ TEST_CASE("native ICP equations and trial-pose error match original Eigen formul
         transform * point + Eigen::Vector3d(0.03, -0.04, 0.05)});
     small_gicp::UnsafeKdTree<small_gicp::PointCloud> tree(target);
     small_gicp::ICPFactor factor;
-    Eigen::Matrix<double, 6, 6> hessian;
-    Eigen::Matrix<double, 6, 1> gradient;
+    small_gicp::factor_detail::Hessian native_hessian{};
+    auto hessian = small_gicp::eigen_view(native_hessian);
+    small_gicp::factor_detail::Gradient native_gradient{};
+    auto gradient = small_gicp::eigen_view(native_gradient);
     double error = 0;
-    REQUIRE(factor.linearize(target, source, tree, transform, 0, Accept{}, &hessian, &gradient, &error));
+    REQUIRE(factor.linearize(target, source, tree, transform, 0, Accept{}, &native_hessian, &native_gradient, &error));
     const Eigen::Vector4d residual = target.point(0) - transform * source.point(0);
     Eigen::Matrix<double, 4, 6> jacobian = Eigen::Matrix<double, 4, 6>::Zero();
     jacobian.topLeftCorner<3, 3>() = transform.linear() * small_gicp::skew(point);
@@ -134,10 +139,12 @@ TEST_CASE("native normal-weighted ICP preserves componentwise not scalar plane e
     target.normal(0) = Eigen::Vector4d(0.3, -0.4, 0.5, 0);
     small_gicp::UnsafeKdTree<small_gicp::PointCloud> tree(target);
     small_gicp::PointToPlaneICPFactor factor;
-    Eigen::Matrix<double, 6, 6> hessian;
-    Eigen::Matrix<double, 6, 1> gradient;
+    small_gicp::factor_detail::Hessian native_hessian{};
+    auto hessian = small_gicp::eigen_view(native_hessian);
+    small_gicp::factor_detail::Gradient native_gradient{};
+    auto gradient = small_gicp::eigen_view(native_gradient);
     double error = 0;
-    REQUIRE(factor.linearize(target, source, tree, transform, 0, Accept{}, &hessian, &gradient, &error));
+    REQUIRE(factor.linearize(target, source, tree, transform, 0, Accept{}, &native_hessian, &native_gradient, &error));
     const Eigen::Vector4d normal = target.normal(0);
     const Eigen::Vector4d residual = target.point(0) - transform * source.point(0);
     const Eigen::Vector4d weighted = normal.array() * residual.array();
@@ -172,11 +179,13 @@ TEST_CASE("native normal-weighted ICP retains zero-normal behavior") {
   target.normal(0).setZero();
   small_gicp::UnsafeKdTree<small_gicp::PointCloud> tree(target);
   small_gicp::PointToPlaneICPFactor factor;
-  Eigen::Matrix<double, 6, 6> hessian;
-  Eigen::Matrix<double, 6, 1> gradient;
+  small_gicp::factor_detail::Hessian native_hessian{};
+  auto hessian = small_gicp::eigen_view(native_hessian);
+  small_gicp::factor_detail::Gradient native_gradient{};
+  auto gradient = small_gicp::eigen_view(native_gradient);
   double error = -1;
   REQUIRE(factor.linearize(target, source, tree, Eigen::Isometry3d::Identity(), 0,
-      Accept{}, &hessian, &gradient, &error));
+      Accept{}, &native_hessian, &native_gradient, &error));
   CHECK(factor.inlier());
   CHECK(hessian.isZero());
   CHECK(gradient.isZero());

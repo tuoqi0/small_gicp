@@ -1,4 +1,5 @@
 #include <robot_core/test/doctest.h>
+#include <small_gicp/util/eigen.hpp>
 #include <small_gicp/registration/reduction.hpp>
 #include <small_gicp/registration/reduction_omp.hpp>
 #include <small_gicp/registration/registration.hpp>
@@ -6,6 +7,10 @@
 #include <small_gicp/points/point_cloud.hpp>
 #include <small_gicp/ann/kdtree.hpp>
 #include <small_gicp/util/normal_estimation.hpp>
+#ifdef BUILD_WITH_TBB
+#include <small_gicp/registration/reduction_tbb.hpp>
+#include <tbb/global_control.h>
+#endif
 
 namespace {
 struct SyntheticFactor {
@@ -14,13 +19,13 @@ struct SyntheticFactor {
 
   template <typename Rejector>
   bool linearize(const int&, const int&, const int&, const Eigen::Isometry3d&,
-                 size_t, const Rejector&, Eigen::Matrix<double, 6, 6>* hessian,
-                 Eigen::Matrix<double, 6, 1>* gradient, double* error) {
+                 size_t, const Rejector&, small_gicp::factor_detail::Hessian* hessian,
+                 small_gicp::factor_detail::Gradient* gradient, double* error) {
     // Rejected factors deliberately write outputs: reducers must skip them.
     for (int row = 0; row < 6; ++row) {
-      (*gradient)[row] = weight * (row - 3);
+      (*gradient)[row][0] = weight * (row - 3);
       for (int col = 0; col < 6; ++col)
-        (*hessian)(row, col) = weight * (10 * row + col + 1);
+        (*hessian)[row][col] = weight * (10 * row + col + 1);
     }
     *error = 0.5 * weight;
     return accepted;
@@ -43,18 +48,18 @@ void checkReduction(const Reduction& reduction, size_t count, bool reject_all) {
     const bool accepted = !reject_all && i % 3 != 0;
     factors.push_back(SyntheticFactor{accepted, weight});
     if (!accepted) continue;
-    Eigen::Matrix<double, 6, 6> hessian;
-    Eigen::Matrix<double, 6, 1> gradient;
+    small_gicp::factor_detail::Hessian hessian{};
+    small_gicp::factor_detail::Gradient gradient{};
     double error = 0;
     factors.back().linearize(0, 0, 0, Eigen::Isometry3d::Identity(), i, 0,
                             &hessian, &gradient, &error);
-    expected_hessian += hessian;
-    expected_gradient += gradient;
+    expected_hessian += small_gicp::eigen_view(hessian);
+    expected_gradient += small_gicp::eigen_view(gradient);
     expected_error += error;
   }
   const auto result = reduction.linearize(0, 0, 0, 0, Eigen::Isometry3d::Identity(), factors);
-  CHECK(std::get<0>(result) == expected_hessian);
-  CHECK(std::get<1>(result) == expected_gradient);
+  CHECK(small_gicp::eigen_view(std::get<0>(result)) == expected_hessian);
+  CHECK(small_gicp::eigen_view(std::get<1>(result)) == expected_gradient);
   CHECK(std::get<2>(result) == expected_error);
   CHECK(reduction.error(0, 0, Eigen::Isometry3d::Identity(), factors) == expected_error);
 }
@@ -76,6 +81,16 @@ TEST_CASE("native OpenMP reduction preserves layout and sums across thread count
     checkReduction(reduction, 97, true);
   }
 }
+
+#ifdef BUILD_WITH_TBB
+TEST_CASE("native TBB reduction preserves accepted rejected and empty sums") {
+  const tbb::global_control limit(tbb::global_control::max_allowed_parallelism, 2);
+  const small_gicp::ParallelReductionTBB reduction;
+  checkReduction(reduction, 0, false);
+  checkReduction(reduction, 97, false);
+  checkReduction(reduction, 97, true);
+}
+#endif
 
 TEST_CASE("native OpenMP reduction retains GICP pose recovery") {
   std::vector<Eigen::Vector3d> map_points, scan_points;

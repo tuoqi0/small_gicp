@@ -3,7 +3,10 @@
 #pragma once
 
 #include <tbb/tbb.h>
-#include <Eigen/Core>
+#include <Eigen/Geometry>
+#include <tuple>
+#include <vector>
+#include <small_gicp/factors/linearization.hpp>
 
 namespace small_gicp {
 
@@ -23,8 +26,8 @@ struct LinearizeSum {
     rejector(rejector),
     T(T),
     factors(factors),
-    H(Eigen::Matrix<double, 6, 6>::Zero()),
-    b(Eigen::Matrix<double, 6, 1>::Zero()),
+    H{},
+    b{},
     e(0.0) {}
 
   LinearizeSum(LinearizeSum& x, tbb::split)
@@ -34,26 +37,27 @@ struct LinearizeSum {
     rejector(x.rejector),
     T(x.T),
     factors(x.factors),
-    H(Eigen::Matrix<double, 6, 6>::Zero()),
-    b(Eigen::Matrix<double, 6, 1>::Zero()),
+    H{},
+    b{},
     e(0.0) {}
 
   void operator()(const tbb::blocked_range<size_t>& r) {
-    Eigen::Matrix<double, 6, 6> Ht = H;
-    Eigen::Matrix<double, 6, 1> bt = b;
+    using earth::mantle::math::operator+;
+    factor_detail::Hessian Ht = H;
+    factor_detail::Gradient bt = b;
     double et = e;
 
     for (size_t i = r.begin(); i != r.end(); i++) {
-      Eigen::Matrix<double, 6, 6> Hi;
-      Eigen::Matrix<double, 6, 1> bi;
+      factor_detail::Hessian Hi;
+      factor_detail::Gradient bi;
       double ei;
 
       if (!factors[i].linearize(target, source, target_tree, T, i, rejector, &Hi, &bi, &ei)) {
         continue;
       }
 
-      Ht += Hi;
-      bt += bi;
+      Ht = Ht + Hi;
+      bt = bt + bi;
       et += ei;
     }
 
@@ -63,8 +67,9 @@ struct LinearizeSum {
   }
 
   void join(const LinearizeSum& y) {
-    H += y.H;
-    b += y.b;
+    using earth::mantle::math::operator+;
+    H = H + y.H;
+    b = b + y.b;
     e += y.e;
   }
 
@@ -75,8 +80,8 @@ struct LinearizeSum {
   const Eigen::Isometry3d& T;
   std::vector<Factor>& factors;
 
-  Eigen::Matrix<double, 6, 6> H;
-  Eigen::Matrix<double, 6, 1> b;
+  factor_detail::Hessian H;
+  factor_detail::Gradient b;
   double e;
 };
 
@@ -115,7 +120,7 @@ struct ParallelReductionTBB {
   ParallelReductionTBB() {}
 
   template <typename TargetPointCloud, typename SourcePointCloud, typename TargetTree, typename CorrespondenceRejector, typename Factor>
-  std::tuple<Eigen::Matrix<double, 6, 6>, Eigen::Matrix<double, 6, 1>, double> linearize(
+  std::tuple<factor_detail::Hessian, factor_detail::Gradient, double> linearize(
     const TargetPointCloud& target,
     const SourcePointCloud& source,
     const TargetTree& target_tree,

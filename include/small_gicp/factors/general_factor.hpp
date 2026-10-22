@@ -4,6 +4,9 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <array>
+#include <cmath>
+#include <small_gicp/factors/linearization.hpp>
 
 namespace small_gicp {
 
@@ -25,8 +28,8 @@ struct NullFactor {
     const SourcePointCloud& source,
     const TargetTree& target_tree,
     const Eigen::Isometry3d& T,
-    Eigen::Matrix<double, 6, 6>* H,
-    Eigen::Matrix<double, 6, 1>* b,
+    factor_detail::Hessian* H,
+    factor_detail::Gradient* b,
     double* e) const {}
 
   /// @brief Update error consisting of per-point factors.
@@ -44,14 +47,20 @@ struct RestrictDoFFactor {
   /// @brief Constructor.
   RestrictDoFFactor() {
     lambda = 1e9;
-    mask.setOnes();
+    mask.fill(1.0);
   }
 
   /// @brief Set rotation mask. (1.0 = active, 0.0 = inactive)
-  void set_rotation_mask(const Eigen::Array3d& rot_mask) { mask.head<3>() = rot_mask; }
+  template <typename Mask>
+  void set_rotation_mask(const Mask& rot_mask) {
+    for (size_t axis = 0; axis < 3; ++axis) mask[axis] = rot_mask[axis];
+  }
 
   /// @brief  Set translation mask. (1.0 = active, 0.0 = inactive)
-  void set_translation_mask(const Eigen::Array3d& trans_mask) { mask.tail<3>() = trans_mask; }
+  template <typename Mask>
+  void set_translation_mask(const Mask& trans_mask) {
+    for (size_t axis = 0; axis < 3; ++axis) mask[axis + 3] = trans_mask[axis];
+  }
 
   /// @brief Update linearized system consisting of linearized per-point factors.
   template <typename TargetPointCloud, typename SourcePointCloud, typename TargetTree>
@@ -60,10 +69,11 @@ struct RestrictDoFFactor {
     const SourcePointCloud& source,
     const TargetTree& target_tree,
     const Eigen::Isometry3d& T,
-    Eigen::Matrix<double, 6, 6>* H,
-    Eigen::Matrix<double, 6, 1>* b,
+    factor_detail::Hessian* H,
+    factor_detail::Gradient* b,
     double* e) const {
-    *H += lambda * (mask - 1.0).abs().matrix().asDiagonal();
+    for (size_t axis = 0; axis < mask.size(); ++axis)
+      (*H)[axis][axis] += lambda * std::abs(mask[axis] - 1.0);
   }
 
   /// @brief Update error consisting of per-point factors.
@@ -71,7 +81,7 @@ struct RestrictDoFFactor {
   void update_error(const TargetPointCloud& target, const SourcePointCloud& source, const Eigen::Isometry3d& T, double* e) const {}
 
   double lambda;                    ///< Regularization parameter (Increasing this makes the constraint stronger)
-  Eigen::Array<double, 6, 1> mask;  ///< Mask for restricting DoF (rx, ry, rz, tx, ty, tz)
+  std::array<double, 6> mask;  ///< Mask for restricting DoF (rx, ry, rz, tx, ty, tz)
 };
 
 }  // namespace small_gicp

@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 #include <robot_core/test/doctest.h>
 #include <small_gicp/util/lie.hpp>
 #include <small_gicp/points/point_cloud.hpp>
@@ -38,11 +39,13 @@ TEST_CASE("GICP precision and linearization agree with the original inverse") {
     target.cov(0).topLeftCorner<3, 3>() = scale * Eigen::Vector3d(0.002, 0.2, 2).asDiagonal();
     small_gicp::UnsafeKdTree<small_gicp::PointCloud> tree(target);
     small_gicp::GICPFactor factor;
-    Eigen::Matrix<double, 6, 6> hessian;
-    Eigen::Matrix<double, 6, 1> gradient;
+    small_gicp::factor_detail::Hessian native_hessian{};
+    auto hessian = small_gicp::eigen_view(native_hessian);
+    small_gicp::factor_detail::Gradient native_gradient{};
+    auto gradient = small_gicp::eigen_view(native_gradient);
     double error;
     REQUIRE(factor.linearize(target, source, tree, transform, 0, Accept{},
-                             &hessian, &gradient, &error));
+                             &native_hessian, &native_gradient, &error));
     REQUIRE(factor.inlier());
     const Eigen::Matrix4d covariance =
         target.cov(0) + transform.matrix() * source.cov(0) * transform.matrix().transpose();
@@ -80,11 +83,13 @@ TEST_CASE("Invalid point covariance rejects the factor without publishing partia
     target.cov(0).setZero();
     if (invalid == 1) target.cov(0)(0, 0) = -1;
     if (invalid == 2) target.cov(0)(0, 0) = std::numeric_limits<double>::quiet_NaN();
-    Eigen::Matrix<double, 6, 6> hessian = Eigen::Matrix<double, 6, 6>::Constant(7);
-    Eigen::Matrix<double, 6, 1> gradient = Eigen::Matrix<double, 6, 1>::Constant(8);
+    small_gicp::factor_detail::Hessian native_hessian = small_gicp::native_matrix(Eigen::Matrix<double, 6, 6>::Constant(7));
+    auto hessian = small_gicp::eigen_view(native_hessian);
+    small_gicp::factor_detail::Gradient native_gradient = small_gicp::native_matrix(Eigen::Matrix<double, 6, 1>::Constant(8));
+    auto gradient = small_gicp::eigen_view(native_gradient);
     double error = 9;
     CHECK_FALSE(factor.linearize(target, source, tree, Eigen::Isometry3d::Identity(), 0,
-                                 Accept{}, &hessian, &gradient, &error));
+                                 Accept{}, &native_hessian, &native_gradient, &error));
     CHECK_FALSE(factor.inlier());
     CHECK((hessian.array() == 7).all());
     CHECK((gradient.array() == 8).all());

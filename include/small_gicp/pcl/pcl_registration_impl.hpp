@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 #pragma once
+#include <small_gicp/util/eigen.hpp>
 
 #include <pcl/impl/pcl_base.hpp>
 #include <pcl/search/impl/search.hpp>
@@ -189,8 +190,8 @@ void RegistrationPCL<PointSource, PointTarget>::setVerbosity(bool verbose) {
 }
 
 template <typename PointSource, typename PointTarget>
-const Eigen::Matrix<double, 6, 6>& RegistrationPCL<PointSource, PointTarget>::getFinalHessian() const {
-  return result_.H;
+Eigen::Matrix<double, 6, 6> RegistrationPCL<PointSource, PointTarget>::getFinalHessian() const {
+  return eigen_view(result_.H);
 }
 
 template <typename PointSource, typename PointTarget>

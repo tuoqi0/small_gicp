@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 #include <iostream>
@@ -25,8 +26,8 @@ void define_result(py::module& m) {
         sst << "iterations=" << result.iterations << "\n";
         sst << "num_inliers=" << result.num_inliers << "\n";
         sst << "T_target_source=\n" << result.T_target_source.matrix() << "\n";
-        sst << "H=\n" << result.H << "\n";
-        sst << "b=\n" << result.b.transpose() << "\n";
+        sst << "H=\n" << eigen_view(result.H) << "\n";
+        sst << "b=\n" << eigen_view(result.b).transpose() << "\n";
         sst << "error= " << result.error << "\n";
         return sst.str();
       })
@@ -37,7 +38,7 @@ void define_result(py::module& m) {
     .def_readonly("converged", &RegistrationResult::converged, "bool : Convergence flag")
     .def_readonly("iterations", &RegistrationResult::iterations, "int : Number of iterations")
     .def_readonly("num_inliers", &RegistrationResult::num_inliers, "int : Number of inliers")
-    .def_readonly("H", &RegistrationResult::H, "NDArray[np.float64] : Final Hessian matrix (6x6)")
-    .def_readonly("b", &RegistrationResult::b, "NDArray[np.float64] : Final information vector (6,)")
+    .def_property_readonly("H", [](const RegistrationResult& result) -> Eigen::Matrix<double, 6, 6> { return eigen_view(result.H); }, "NDArray[np.float64] : Final Hessian matrix (6x6)")
+    .def_property_readonly("b", [](const RegistrationResult& result) -> Eigen::Matrix<double, 6, 1> { return eigen_view(result.b); }, "NDArray[np.float64] : Final information vector (6,)")
     .def_readonly("error", &RegistrationResult::error, "float : Final error");
 }

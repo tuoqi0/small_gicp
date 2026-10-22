@@ -83,8 +83,9 @@ public:
 
       const Eigen::Isometry3d T_shifted_source = T_source_shifted[i].inverse();
 
-      shifted[i] = std::make_shared<PointCloud>(source->points);
-      std::transform(source->points.begin(), source->points.end(), shifted[i]->points.begin(), [&](const auto& p) -> Eigen::Vector4d { return T_shifted_source * p; });
+      shifted[i] = std::make_shared<PointCloud>(*source);
+      for (size_t point_index = 0; point_index < source->size(); ++point_index)
+        shifted[i]->point(point_index) = T_shifted_source * source->point(point_index);
       estimate_normals_covariances_omp(*shifted[i]);
     }
 

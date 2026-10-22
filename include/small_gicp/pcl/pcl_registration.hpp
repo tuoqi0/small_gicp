@@ -62,7 +62,7 @@ public:
   void setVerbosity(bool verbose);
 
   /// @brief Get the final Hessian matrix ([rx, ry, rz, tx, ty, tz]).
-  const Eigen::Matrix<double, 6, 6>& getFinalHessian() const;
+  Eigen::Matrix<double, 6, 6> getFinalHessian() const;
 
   /// @brief Get the detailed registration result.
   const RegistrationResult& getRegistrationResult() const;

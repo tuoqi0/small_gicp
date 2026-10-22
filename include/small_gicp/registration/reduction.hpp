@@ -4,9 +4,8 @@
 
 #include <vector>
 #include <tuple>
-#include <Eigen/Core>
 #include <Eigen/Geometry>
-#include <math/fixed_matrix_ops.h>
+#include <small_gicp/factors/linearization.hpp>
 
 namespace small_gicp {
 
@@ -21,7 +20,7 @@ struct SerialReduction {
   /// @param factors      Factors to be linearized
   /// @return             Sum of the linearized systems (information matrix, information vector, and error)
   template <typename TargetPointCloud, typename SourcePointCloud, typename TargetTree, typename CorrespondenceRejector, typename Factor>
-  std::tuple<Eigen::Matrix<double, 6, 6>, Eigen::Matrix<double, 6, 1>, double> linearize(
+  std::tuple<factor_detail::Hessian, factor_detail::Gradient, double> linearize(
     const TargetPointCloud& target,
     const SourcePointCloud& source,
     const TargetTree& target_tree,
@@ -30,29 +29,25 @@ struct SerialReduction {
     std::vector<Factor>& factors) const {
     using earth::mantle::collection::Matrix;
     using earth::mantle::math::operator+;
-    using PackedHessian = Eigen::Matrix<double, 6, 6, Eigen::RowMajor>;
     Matrix<double, 6, 6> sum_H{};
     Matrix<double, 6, 1> sum_b{};
     double sum_e = 0.0;
 
     for (size_t i = 0; i < factors.size(); i++) {
-      Eigen::Matrix<double, 6, 6> H;
-      Eigen::Matrix<double, 6, 1> b;
+      factor_detail::Hessian H{};
+      factor_detail::Gradient b{};
       double e;
 
       if (!factors[i].linearize(target, source, target_tree, T, i, rejector, &H, &b, &e)) {
         continue;
       }
 
-      // Factor outputs remain Eigen at this boundary; accumulation is native.
-      const PackedHessian packed_H = H;
-      sum_H = sum_H + Matrix<double, 6, 6>::from(packed_H.data(), 36);
-      sum_b = sum_b + Matrix<double, 6, 1>::from(b.data(), 6);
+      sum_H = sum_H + H;
+      sum_b = sum_b + b;
       sum_e += e;
     }
 
-    return {Eigen::Map<const PackedHessian>(sum_H.raw_pointer()),
-            Eigen::Map<const Eigen::Matrix<double, 6, 1>>(sum_b.raw_pointer()), sum_e};
+    return {sum_H, sum_b, sum_e};
   }
 
   /// @brief Sum up evaluated errors

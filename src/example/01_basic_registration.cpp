@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 
@@ -23,8 +24,8 @@ void example1(const std::vector<Eigen::Vector4f>& target_points, const std::vect
   std::cout << "error:" << result.error << std::endl;
   std::cout << "iterations:" << result.iterations << std::endl;
   std::cout << "num_inliers:" << result.num_inliers << std::endl;
-  std::cout << "--- H ---" << std::endl << result.H << std::endl;
-  std::cout << "--- b ---" << std::endl << result.b.transpose() << std::endl;
+  std::cout << "--- H ---" << std::endl << small_gicp::eigen_view(result.H) << std::endl;
+  std::cout << "--- b ---" << std::endl << small_gicp::eigen_view(result.b).transpose() << std::endl;
 }
 
 /// @brief Example to perform preprocessing and registration separately.
@@ -49,8 +50,8 @@ void example2(const std::vector<Eigen::Vector4f>& target_points, const std::vect
   std::cout << "error:" << result.error << std::endl;
   std::cout << "iterations:" << result.iterations << std::endl;
   std::cout << "num_inliers:" << result.num_inliers << std::endl;
-  std::cout << "--- H ---" << std::endl << result.H << std::endl;
-  std::cout << "--- b ---" << std::endl << result.b.transpose() << std::endl;
+  std::cout << "--- H ---" << std::endl << small_gicp::eigen_view(result.H) << std::endl;
+  std::cout << "--- b ---" << std::endl << small_gicp::eigen_view(result.b).transpose() << std::endl;
 
   // Preprocessed points and trees can be reused for the next registration for efficiency
   RegistrationResult result2 = align(*source, *target, *source_tree, Eigen::Isometry3d::Identity(), setting);

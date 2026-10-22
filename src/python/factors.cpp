@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 #include <iostream>
@@ -59,11 +60,11 @@ void define_factors(py::module& m) {
         const Eigen::Matrix4d& T,
         size_t source_index,
         const DistanceRejector& rejector) -> std::tuple<bool, Eigen::Matrix<double, 6, 6>, Eigen::Matrix<double, 6, 1>, double> {
-        Eigen::Matrix<double, 6, 6> H = Eigen::Matrix<double, 6, 6>::Zero();
-        Eigen::Matrix<double, 6, 1> b = Eigen::Matrix<double, 6, 1>::Zero();
+        factor_detail::Hessian H{};
+        factor_detail::Gradient b{};
         double e = 0.0;
         bool succ = factor.linearize(target, source, kdtree, Eigen::Isometry3d(T), source_index, rejector, &H, &b, &e);
-        return std::make_tuple(succ, H, b, e);
+        return std::make_tuple(succ, Eigen::Matrix<double, 6, 6>(eigen_view(H)), Eigen::Matrix<double, 6, 1>(eigen_view(b)), e);
       },
       py::arg("target"),
       py::arg("source"),
@@ -120,11 +121,11 @@ void define_factors(py::module& m) {
         const Eigen::Matrix4d& T,
         size_t source_index,
         const DistanceRejector& rejector) -> std::tuple<bool, Eigen::Matrix<double, 6, 6>, Eigen::Matrix<double, 6, 1>, double> {
-        Eigen::Matrix<double, 6, 6> H = Eigen::Matrix<double, 6, 6>::Zero();
-        Eigen::Matrix<double, 6, 1> b = Eigen::Matrix<double, 6, 1>::Zero();
+        factor_detail::Hessian H{};
+        factor_detail::Gradient b{};
         double e = 0.0;
         bool succ = factor.linearize(target, source, kdtree, Eigen::Isometry3d(T), source_index, rejector, &H, &b, &e);
-        return std::make_tuple(succ, H, b, e);
+        return std::make_tuple(succ, Eigen::Matrix<double, 6, 6>(eigen_view(H)), Eigen::Matrix<double, 6, 1>(eigen_view(b)), e);
       },
       py::arg("target"),
       py::arg("source"),
@@ -181,11 +182,11 @@ void define_factors(py::module& m) {
         const Eigen::Matrix4d& T,
         size_t source_index,
         const DistanceRejector& rejector) -> std::tuple<bool, Eigen::Matrix<double, 6, 6>, Eigen::Matrix<double, 6, 1>, double> {
-        Eigen::Matrix<double, 6, 6> H = Eigen::Matrix<double, 6, 6>::Zero();
-        Eigen::Matrix<double, 6, 1> b = Eigen::Matrix<double, 6, 1>::Zero();
+        factor_detail::Hessian H{};
+        factor_detail::Gradient b{};
         double e = 0.0;
         bool succ = factor.linearize(target, source, kdtree, Eigen::Isometry3d(T), source_index, rejector, &H, &b, &e);
-        return std::make_tuple(succ, H, b, e);
+        return std::make_tuple(succ, Eigen::Matrix<double, 6, 6>(eigen_view(H)), Eigen::Matrix<double, 6, 1>(eigen_view(b)), e);
       },
       py::arg("target"),
       py::arg("source"),

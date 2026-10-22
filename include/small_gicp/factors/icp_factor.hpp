@@ -26,8 +26,8 @@ struct ICPFactor {
     const Eigen::Isometry3d& T,
     size_t source_index,
     const CorrespondenceRejector& rejector,
-    Eigen::Matrix<double, 6, 6>* H,
-    Eigen::Matrix<double, 6, 1>* b,
+    factor_detail::Hessian* H,
+    factor_detail::Gradient* b,
     double* e) {
     //
     this->source_index = source_index;
@@ -58,11 +58,7 @@ struct ICPFactor {
     const auto rotation = Matrix<double, 3, 3>::from(packed_rotation.data(), packed_rotation.size());
     const auto jacobian = factor_detail::pointJacobian(
         Matrix<double, 4, 1>::from(source_point.data(), source_point.size()), rotation);
-    factor_detail::Hessian hessian{};
-    factor_detail::Gradient gradient{};
-    factor_detail::linearizeResidual(jacobian, residual, hessian, gradient, *e);
-    *H = Eigen::Map<const Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>(hessian.raw_pointer());
-    *b = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(gradient.raw_pointer());
+    factor_detail::linearizeResidual(jacobian, residual, *H, *b, *e);
 
     return true;
   }

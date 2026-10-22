@@ -94,7 +94,7 @@ RegistrationResult result = align(target_points, source_points, init_T_target_so
 
 Eigen::Isometry3d T = result.T_target_source;  // Estimated transformation
 size_t num_inliers = result.num_inliers;       // Number of inlier source points
-Eigen::Matrix<double, 6, 6> H = result.H;      // Final Hessian matrix (6x6)
+auto H = result.H;                          // Native Mantle Hessian matrix (6x6)
 ```
 
 There is also a way to perform preprocessing and registration separately. This enables saving time for preprocessing in case registration is performed several times for the same point cloud (e.g., typical odometry estimation based on scan-to-scan matching).
@@ -122,7 +122,7 @@ RegistrationResult result = align(*target, *source, *target_tree, init_T_target_
 
 Eigen::Isometry3d T = result.T_target_source;  // Estimated transformation
 size_t num_inliers = result.num_inliers;       // Number of inlier source points
-Eigen::Matrix<double, 6, 6> H = result.H;      // Final Hessian matrix (6x6)
+auto H = result.H;                          // Native Mantle Hessian matrix (6x6)
 ```
 
 </details>
@@ -246,7 +246,7 @@ auto result = registration.align(*target, *source, *target_tree, init_T_target_s
 
 Eigen::Isometry3d T = result.T_target_source;  // Estimated transformation
 size_t num_inliers = result.num_inliers;       // Number of inlier source points
-Eigen::Matrix<double, 6, 6> H = result.H;      // Final Hessian matrix (6x6)
+auto H = result.H;                          // Native Mantle Hessian matrix (6x6)
 ```
 
 See [03_registration_template.cpp](src/example/03_registration_template.cpp)  for more detailed customization examples.
