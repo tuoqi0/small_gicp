@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 #include <iostream>
@@ -28,11 +29,11 @@ void define_pointcloud(py::module& m) {
         pc->resize(points.rows());
         if (points.cols() == 3) {
           for (size_t i = 0; i < points.rows(); i++) {
-            pc->point(i) << points.row(i).transpose(), 1.0;
+            small_gicp::eigen_view(pc->point(i)) << points.row(i).transpose(), 1.0;
           }
         } else {
           for (size_t i = 0; i < points.rows(); i++) {
-            pc->point(i) << points.row(i).transpose();
+            small_gicp::eigen_view(pc->point(i)) << points.row(i).transpose();
           }
         }
 
@@ -78,7 +79,7 @@ void define_pointcloud(py::module& m) {
       [](const PointCloud& points) -> Eigen::MatrixXd {
         Eigen::MatrixXd output(static_cast<Eigen::Index>(points.size()), 4);
         for (size_t i = 0; i < points.size(); ++i) {
-          output.row(static_cast<Eigen::Index>(i)) = points.point(i).transpose();
+          output.row(static_cast<Eigen::Index>(i)) = small_gicp::eigen_view(points.point(i)).transpose();
         }
         return output;
       },
@@ -95,7 +96,7 @@ void define_pointcloud(py::module& m) {
       [](const PointCloud& points) -> Eigen::MatrixXd {
         Eigen::MatrixXd output(static_cast<Eigen::Index>(points.size()), 4);
         for (size_t i = 0; i < points.size(); ++i) {
-          output.row(static_cast<Eigen::Index>(i)) = points.normal(i).transpose();
+          output.row(static_cast<Eigen::Index>(i)) = small_gicp::eigen_view(points.normal(i)).transpose();
         }
         return output;
       },
@@ -113,7 +114,7 @@ void define_pointcloud(py::module& m) {
         std::vector<Eigen::Matrix4d> output;
         output.reserve(points.size());
         for (size_t i = 0; i < points.size(); ++i) {
-          output.push_back(points.cov(i));
+          output.push_back(small_gicp::eigen_view(points.cov(i)));
         }
         return output;
       },
@@ -127,7 +128,7 @@ void define_pointcloud(py::module& m) {
         )pbdoc")
     .def(
       "point",
-      [](const PointCloud& points, size_t i) -> Eigen::Vector4d { return points.point(i); },
+      [](const PointCloud& points, size_t i) -> Eigen::Vector4d { return small_gicp::eigen_view(points.point(i)); },
       py::arg("i"),
       R"pbdoc(
         Get the i-th point.
@@ -144,7 +145,7 @@ void define_pointcloud(py::module& m) {
         )pbdoc")
     .def(
       "normal",
-      [](const PointCloud& points, size_t i) -> Eigen::Vector4d { return points.normal(i); },
+      [](const PointCloud& points, size_t i) -> Eigen::Vector4d { return small_gicp::eigen_view(points.normal(i)); },
       py::arg("i"),
       R"pbdoc(
         Get the i-th normal.
@@ -161,7 +162,7 @@ void define_pointcloud(py::module& m) {
         )pbdoc")
     .def(
       "cov",
-      [](const PointCloud& points, size_t i) -> Eigen::Matrix4d { return points.cov(i); },
+      [](const PointCloud& points, size_t i) -> Eigen::Matrix4d { return small_gicp::eigen_view(points.cov(i)); },
       py::arg("i"),
       R"pbdoc(
         Get the i-th covariance matrix.

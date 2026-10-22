@@ -24,6 +24,16 @@ Eigen::Map<const EigenMatrix<T, Rows, Cols>> eigen_view(const earth::mantle::col
 template <typename T, size_t Rows, size_t Cols>
 void eigen_view(const earth::mantle::collection::Matrix<T, Rows, Cols>&&) = delete;
 
+// A value-returning boundary is safe for the value getters used by traits.
+template <typename T, size_t Rows, size_t Cols>
+EigenMatrix<T, Rows, Cols> eigen_matrix(const earth::mantle::collection::Matrix<T, Rows, Cols>& value) {
+  return eigen_view(value);
+}
+template <typename Derived>
+typename Derived::PlainObject eigen_matrix(const Eigen::MatrixBase<Derived>& value) {
+  return value;
+}
+
 template <typename Derived>
 auto native_matrix(const Eigen::MatrixBase<Derived>& value) {
   static_assert(Derived::RowsAtCompileTime > 0 && Derived::ColsAtCompileTime > 0,

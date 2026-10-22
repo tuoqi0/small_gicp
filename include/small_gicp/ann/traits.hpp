@@ -5,8 +5,21 @@
 #include <type_traits>
 #include <cstddef>
 #include <utility>
+#include <small_gicp/points/traits.hpp>
 
 namespace small_gicp {
+
+namespace ann_detail {
+template <typename Point, typename Query>
+double squared_distance(const Point& point, const Query& query) {
+  const double dx = traits::detail::coordinate(point, 0) - traits::detail::coordinate(query, 0);
+  const double dy = traits::detail::coordinate(point, 1) - traits::detail::coordinate(query, 1);
+  const double dz = traits::detail::coordinate(point, 2) - traits::detail::coordinate(query, 2);
+  const double dw = traits::detail::coordinate(point, 3) - traits::detail::coordinate(query, 3);
+  // Preserve the former four-coordinate packet reduction order.
+  return (dx * dx + dz * dz) + (dy * dy + dw * dw);
+}
+}
 
 namespace traits {
 

@@ -8,8 +8,7 @@
 #include <memory>
 #include <utility>
 
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+#include <small_gicp/util/lie.hpp>
 
 #include <small_gicp/ann/traits.hpp>
 #include <small_gicp/ann/knn_result.hpp>
@@ -26,11 +25,11 @@ public:
   /// @brief Constructor.
   /// @param coord Integer voxel coordinates
   /// @param lru   LRU counter for caching
-  VoxelInfo(const Eigen::Vector3i& coord, size_t lru) : lru(lru), coord(coord) {}
+  VoxelInfo(const VoxelCoord& coord, size_t lru) : lru(lru), coord(coord) {}
 
 public:
   size_t lru;             ///< Last used time
-  Eigen::Vector3i coord;  ///< Voxel coordinate
+  VoxelCoord coord;  ///< Voxel coordinate
 };
 
 /// @brief Incremental voxelmap.
@@ -55,11 +54,12 @@ public:
   /// @param points Point cloud
   /// @param T      Transformation matrix
   template <typename PointCloud>
-  void insert(const PointCloud& points, const Eigen::Isometry3d& T = Eigen::Isometry3d::Identity()) {
+  void insert(const PointCloud& points, const Transform& T = earth::mantle::math::identityMatrix<double, 4>()) {
+    using earth::mantle::math::operator*;
     // Insert points to the voxelmap
     for (size_t i = 0; i < traits::size(points); i++) {
-      const Eigen::Vector4d pt = T * traits::point(points, i);
-      const Eigen::Vector3i coord = fast_floor(pt * inv_leaf_size).template head<3>();
+      const auto pt = T * traits::point_matrix(points, i);
+      const auto coord = voxel_coordinates(pt, inv_leaf_size);
 
       auto found = voxels.find(coord);
       if (found == voxels.end()) {
@@ -99,14 +99,15 @@ public:
   /// @param index    Index of the nearest neighbor
   /// @param sq_dist  Squared distance to the nearest neighbor
   /// @return         Number of found points (0 or 1)
-  size_t nearest_neighbor_search(const Eigen::Vector4d& pt, size_t* index, double* sq_dist) const {
-    const Eigen::Vector3i center = fast_floor(pt * inv_leaf_size).template head<3>();
+  template <typename Query>
+  size_t nearest_neighbor_search(const Query& pt, size_t* index, double* sq_dist) const {
+    const auto center = voxel_coordinates(pt, inv_leaf_size);
     size_t voxel_index = 0;
     const auto index_transform = [&](size_t i) { return calc_index(voxel_index, i); };
     KnnResult<1, decltype(index_transform)> result(index, sq_dist, -1, index_transform);
 
     for (const auto& offset : search_offsets) {
-      const Eigen::Vector3i coord = center + offset;
+      const VoxelCoord coord{{center[0] + offset[0], center[1] + offset[1], center[2] + offset[2]}};
       const auto found = voxels.find(coord);
       if (found == voxels.end()) {
         continue;
@@ -127,15 +128,16 @@ public:
   /// @param k_indices   Indices of nearest neighbors
   /// @param k_sq_dists  Squared distances to nearest neighbors (sorted in ascending order)
   /// @return            Number of found points
-  size_t knn_search(const Eigen::Vector4d& pt, size_t k, size_t* k_indices, double* k_sq_dists) const {
-    const Eigen::Vector3i center = fast_floor(pt * inv_leaf_size).template head<3>();
+  template <typename Query>
+  size_t knn_search(const Query& pt, size_t k, size_t* k_indices, double* k_sq_dists) const {
+    const auto center = voxel_coordinates(pt, inv_leaf_size);
 
     size_t voxel_index = 0;
     const auto index_transform = [&](size_t i) { return calc_index(voxel_index, i); };
     KnnResult<-1, decltype(index_transform)> result(k_indices, k_sq_dists, k, index_transform);
 
     for (const auto& offset : search_offsets) {
-      const Eigen::Vector3i coord = center + offset;
+      const VoxelCoord coord{{center[0] + offset[0], center[1] + offset[1], center[2] + offset[2]}};
       const auto found = voxels.find(coord);
       if (found == voxels.end()) {
         continue;
@@ -164,23 +166,23 @@ public:
         std::cerr << "       : using default search_offsets=1" << std::endl;
         [[fallthrough]];
       case 1:
-        search_offsets = {Eigen::Vector3i(0, 0, 0)};
+        search_offsets = {VoxelCoord{{0, 0, 0}}};
         break;
       case 7:
         search_offsets = {
-          Eigen::Vector3i(0, 0, 0),
-          Eigen::Vector3i(1, 0, 0),
-          Eigen::Vector3i(0, 1, 0),
-          Eigen::Vector3i(0, 0, 1),
-          Eigen::Vector3i(-1, 0, 0),
-          Eigen::Vector3i(0, -1, 0),
-          Eigen::Vector3i(0, 0, -1)};
+          VoxelCoord{{0, 0, 0}},
+          VoxelCoord{{1, 0, 0}},
+          VoxelCoord{{0, 1, 0}},
+          VoxelCoord{{0, 0, 1}},
+          VoxelCoord{{-1, 0, 0}},
+          VoxelCoord{{0, -1, 0}},
+          VoxelCoord{{0, 0, -1}}};
         break;
       case 27:
         for (int i = -1; i <= 1; i++) {
           for (int j = -1; j <= 1; j++) {
             for (int k = -1; k <= 1; k++) {
-              search_offsets.emplace_back(i, j, k);
+              search_offsets.push_back(VoxelCoord{{i, j, k}});
             }
           }
         }
@@ -198,11 +200,11 @@ public:
   size_t lru_clear_cycle;  ///< LRU clear cycle. Voxel deletion is performed every lru_clear_cycle steps.
   size_t lru_counter;      ///< LRU counter. Incremented every step.
 
-  std::vector<Eigen::Vector3i> search_offsets;  ///< Voxel search offsets.
+  std::vector<VoxelCoord> search_offsets;  ///< Voxel search offsets.
 
   typename VoxelContents::Setting voxel_setting;                                  ///< Voxel setting.
   std::vector<std::shared_ptr<std::pair<VoxelInfo, VoxelContents>>> flat_voxels;  ///< Voxel contents.
-  std::unordered_map<Eigen::Vector3i, size_t, XORVector3iHash> voxels;            ///< Voxel index map.
+  std::unordered_map<VoxelCoord, size_t, XORVector3iHash> voxels;            ///< Voxel index map.
 };
 
 namespace traits {
@@ -211,19 +213,19 @@ template <typename VoxelContents>
 struct Traits<IncrementalVoxelMap<VoxelContents>> {
   static size_t size(const IncrementalVoxelMap<VoxelContents>& voxelmap) { return voxelmap.size(); }
 
-  static Eigen::Vector4d point(const IncrementalVoxelMap<VoxelContents>& voxelmap, size_t i) {
+  static auto point(const IncrementalVoxelMap<VoxelContents>& voxelmap, size_t i) {
     const size_t voxel_id = voxelmap.voxel_id(i);
     const size_t point_id = voxelmap.point_id(i);
     const auto& voxel = voxelmap.flat_voxels[voxel_id]->second;
     return traits::point(voxel, point_id);
   }
-  static Eigen::Vector4d normal(const IncrementalVoxelMap<VoxelContents>& voxelmap, size_t i) {
+  static auto normal(const IncrementalVoxelMap<VoxelContents>& voxelmap, size_t i) {
     const size_t voxel_id = voxelmap.voxel_id(i);
     const size_t point_id = voxelmap.point_id(i);
     const auto& voxel = voxelmap.flat_voxels[voxel_id]->second;
     return traits::normal(voxel, point_id);
   }
-  static Eigen::Matrix4d cov(const IncrementalVoxelMap<VoxelContents>& voxelmap, size_t i) {
+  static auto cov(const IncrementalVoxelMap<VoxelContents>& voxelmap, size_t i) {
     const size_t voxel_id = voxelmap.voxel_id(i);
     const size_t point_id = voxelmap.point_id(i);
     const auto& voxel = voxelmap.flat_voxels[voxel_id]->second;
@@ -232,12 +234,12 @@ struct Traits<IncrementalVoxelMap<VoxelContents>> {
 
   template <typename Query>
   static size_t nearest_neighbor_search(const IncrementalVoxelMap<VoxelContents>& voxelmap, const Query& pt, size_t* k_index, double* k_sq_dist) {
-    return voxelmap.nearest_neighbor_search(Eigen::Vector4d(pt[0], pt[1], pt[2], pt[3]), k_index, k_sq_dist);
+    return voxelmap.nearest_neighbor_search(pt, k_index, k_sq_dist);
   }
 
   template <typename Query>
   static size_t knn_search(const IncrementalVoxelMap<VoxelContents>& voxelmap, const Query& pt, int k, size_t* k_index, double* k_sq_dist) {
-    return voxelmap.knn_search(Eigen::Vector4d(pt[0], pt[1], pt[2], pt[3]), k, k_index, k_sq_dist);
+    return voxelmap.knn_search(pt, k, k_index, k_sq_dist);
   }
 };
 
@@ -257,8 +259,8 @@ std::vector<size_t> point_indices(const IncrementalVoxelMap<VoxelContents>& voxe
 }
 
 template <typename VoxelContents>
-std::vector<Eigen::Vector4d> voxel_points(const IncrementalVoxelMap<VoxelContents>& voxelmap) {
-  std::vector<Eigen::Vector4d> points;
+std::vector<earth::mantle::collection::Matrix<double, 4, 1>> voxel_points(const IncrementalVoxelMap<VoxelContents>& voxelmap) {
+  std::vector<earth::mantle::collection::Matrix<double, 4, 1>> points;
   points.reserve(voxelmap.size() * 5);
 
   for (const auto& voxel : voxelmap.flat_voxels) {
@@ -270,8 +272,8 @@ std::vector<Eigen::Vector4d> voxel_points(const IncrementalVoxelMap<VoxelContent
 }
 
 template <typename VoxelContents>
-std::vector<Eigen::Vector4d> voxel_normals(const IncrementalVoxelMap<VoxelContents>& voxelmap) {
-  std::vector<Eigen::Vector4d> normals;
+std::vector<earth::mantle::collection::Matrix<double, 4, 1>> voxel_normals(const IncrementalVoxelMap<VoxelContents>& voxelmap) {
+  std::vector<earth::mantle::collection::Matrix<double, 4, 1>> normals;
   normals.reserve(voxelmap.size() * 5);
 
   for (const auto& voxel : voxelmap.flat_voxels) {
@@ -283,8 +285,8 @@ std::vector<Eigen::Vector4d> voxel_normals(const IncrementalVoxelMap<VoxelConten
 }
 
 template <typename VoxelContents>
-std::vector<Eigen::Matrix4d> voxel_covs(const IncrementalVoxelMap<VoxelContents>& voxelmap) {
-  std::vector<Eigen::Matrix4d> covs;
+std::vector<earth::mantle::collection::Matrix<double, 4, 4>> voxel_covs(const IncrementalVoxelMap<VoxelContents>& voxelmap) {
+  std::vector<earth::mantle::collection::Matrix<double, 4, 4>> covs;
   covs.reserve(voxelmap.size() * 5);
 
   for (const auto& voxel : voxelmap.flat_voxels) {

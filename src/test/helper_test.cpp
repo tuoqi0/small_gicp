@@ -2,6 +2,7 @@
 #include <string>
 #include <cmath>
 #include <small_gicp/registration/registration_helper.hpp>
+#include <small_gicp/util/eigen.hpp>
 
 #include <small_gicp/benchmark/read_points.hpp>
 #include <small_gicp/registration/registration_helper.hpp>
@@ -15,6 +16,8 @@ public:
     // Load points
     target_raw = std::make_shared<PointCloud>(read_ply("data/target.ply"));
     source_raw = std::make_shared<PointCloud>(read_ply("data/source.ply"));
+    for (const auto& point : target_raw->points) target_eigen.push_back(eigen_matrix(point));
+    for (const auto& point : source_raw->points) source_eigen.push_back(eigen_matrix(point));
 
     std::ifstream ifs("data/T_target_source.txt");
     if (!ifs) {
@@ -44,6 +47,8 @@ public:
 protected:
   PointCloud::Ptr target_raw;         ///< Target points
   PointCloud::Ptr source_raw;         ///< Source points
+  std::vector<Eigen::Vector4d> target_eigen;
+  std::vector<Eigen::Vector4d> source_eigen;
   Eigen::Isometry3d T_target_source;  ///< Ground truth transformation
 };
 
@@ -71,7 +76,7 @@ TEST_CASE_FIXTURE(HelperTest, "HelperTest.Preprocess") {
     CHECK_MESSAGE((target->size()) > (1000), ("N="), (N));
     CHECK_MESSAGE((target->size()) < (target_raw->size()), ("N="), (N));
 
-    auto [target2, target_tree2] = preprocess_points(target_raw->points, 0.1, 10, N);
+    auto [target2, target_tree2] = preprocess_points(target_eigen, 0.1, 10, N);
     CHECK_MESSAGE((target2), ("N="), (N));
     CHECK_MESSAGE((target_tree2), ("N="), (N));
     CHECK_MESSAGE(std::abs(static_cast<double>(target->size()) - static_cast<double>(target2->size())) <= (100), ("N="), (N));
@@ -111,12 +116,12 @@ TEST_CASE_FIXTURE(HelperTest, "HelperTest.AlignEigen") {
       }
 
       // Forward test
-      auto result = align(target_raw->points, source_raw->points, Eigen::Isometry3d::Identity(), setting);
-      CHECK((compare_transformation(T_target_source, result.T_target_source)));
+      auto result = align(target_eigen, source_eigen, Eigen::Isometry3d::Identity(), setting);
+      CHECK((compare_transformation(T_target_source, eigen_transform(result.T_target_source))));
 
       // Backward test
-      auto result2 = align(source_raw->points, target_raw->points, Eigen::Isometry3d::Identity(), setting);
-      CHECK((compare_transformation(T_target_source, result2.T_target_source.inverse())));
+      auto result2 = align(source_eigen, target_eigen, Eigen::Isometry3d::Identity(), setting);
+      CHECK((compare_transformation(T_target_source, eigen_transform(result2.T_target_source).inverse())));
     }
   }
 }
@@ -151,7 +156,7 @@ TEST_CASE_FIXTURE(HelperTest, "HelperTest.AlignSmall") {
         auto target_voxelmap = create_gaussian_voxelmap(*target, 1.0);
         result = align(*target_voxelmap, *source, Eigen::Isometry3d::Identity(), setting);
       }
-      CHECK((compare_transformation(T_target_source, result.T_target_source)));
+      CHECK((compare_transformation(T_target_source, eigen_transform(result.T_target_source))));
 
       // Backward test
       if (method != "VGICP") {
@@ -160,7 +165,7 @@ TEST_CASE_FIXTURE(HelperTest, "HelperTest.AlignSmall") {
         auto source_voxelmap = create_gaussian_voxelmap(*source, 1.0);
         result = align(*source_voxelmap, *target, Eigen::Isometry3d::Identity(), setting);
       }
-      CHECK((compare_transformation(T_target_source, result.T_target_source.inverse())));
+      CHECK((compare_transformation(T_target_source, eigen_transform(result.T_target_source).inverse())));
     }
   }
 }

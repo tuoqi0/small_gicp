@@ -27,6 +27,9 @@ struct Traits<pcl::PointCloud<PointType>> {
   static bool has_covs(const Points& points) { return !points.empty(); }
 
   static void set_point(Points& points, size_t i, const Eigen::Vector4d& pt) { points.at(i).getVector4fMap() = pt.template cast<float>(); }
+  static void set_point(Points& points, size_t i, const earth::mantle::collection::Matrix<double, 4, 1>& pt) {
+    points.at(i).getVector4fMap() = Eigen::Map<const Eigen::Vector4d>(pt.raw_pointer()).cast<float>();
+  }
   static void set_normal(Points& points, size_t i, const Eigen::Vector4d& pt) { points.at(i).getNormalVector4fMap() = pt.template cast<float>(); }
   static void set_cov(Points& points, size_t i, const Eigen::Matrix4d& cov) { points.at(i).getCovariance4fMap() = cov.template cast<float>(); }
   static void set_normal(Points& points, size_t i, const std::array<double, 4>& normal) {

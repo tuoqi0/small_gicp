@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 #include <robot_core/test/doctest.h>
 #include <small_gicp/points/point_cloud.hpp>
 #include <small_gicp/util/normal_estimation.hpp>
@@ -7,7 +8,8 @@
 namespace {
 struct OrderedNeighbors {
   size_t count;
-  size_t knn_search(const Eigen::Vector4d&, int, size_t* indices, double* distances) const {
+  template <typename Query>
+  size_t knn_search(const Query&, int, size_t* indices, double* distances) const {
     for (size_t i = 0; i < count; ++i) {
       indices[i] = i;
       distances[i] = 0;
@@ -29,8 +31,8 @@ TEST_CASE("native local features preserve the Eigen population covariance formul
       Eigen::Vector4d sum = Eigen::Vector4d::Zero();
       Eigen::Matrix4d cross = Eigen::Matrix4d::Zero();
       for (size_t i = 0; i < count; ++i) {
-        sum += cloud.point(i);
-        cross += cloud.point(i) * cloud.point(i).transpose();
+        sum += small_gicp::eigen_view(cloud.point(i));
+        cross += small_gicp::eigen_view(cloud.point(i)) * small_gicp::eigen_view(cloud.point(i)).transpose();
       }
       const Eigen::Vector4d mean = sum / count;
       const Eigen::Matrix4d covariance = (cross - mean * sum.transpose()) / count;
@@ -46,16 +48,16 @@ TEST_CASE("native local features preserve the Eigen population covariance formul
           vectors(row, col) = expected.vectors[row * 3 + col];
       Eigen::Vector4d normal = Eigen::Vector4d::Zero();
       normal.head<3>() = vectors.col(0).normalized();
-      if (cloud.point(0).dot(normal) > 0) normal = -normal;
+      if (small_gicp::eigen_view(cloud.point(0)).dot(normal) > 0) normal = -normal;
       const Eigen::Vector3d values(1e-3, 1, 1);
       const Eigen::Matrix3d regularized = vectors * values.asDiagonal() * vectors.transpose();
       OrderedNeighbors tree{count};
       small_gicp::estimate_local_features<small_gicp::NormalCovarianceSetter<small_gicp::PointCloud>>(
         cloud, tree, static_cast<int>(count), 0);
-      CHECK((cloud.normal(0) - normal).norm() < 1e-11);
-      CHECK((cloud.cov(0).topLeftCorner<3, 3>() - regularized).norm() < 1e-11);
-      CHECK(cloud.cov(0).row(3).isZero());
-      CHECK(cloud.cov(0).col(3).isZero());
+      CHECK((small_gicp::eigen_view(cloud.normal(0)) - normal).norm() < 1e-11);
+      CHECK((small_gicp::eigen_view(cloud.cov(0)).topLeftCorner<3, 3>() - regularized).norm() < 1e-11);
+      CHECK(small_gicp::eigen_view(cloud.cov(0)).row(3).isZero());
+      CHECK(small_gicp::eigen_view(cloud.cov(0)).col(3).isZero());
     }
   }
 }
@@ -66,15 +68,15 @@ TEST_CASE("local features retain the insufficient-neighbor and nonfinite fallbac
   OrderedNeighbors tree{4};
   small_gicp::estimate_normals_covariances(cloud, tree, 5);
   for (size_t i = 0; i < cloud.size(); ++i) {
-    CHECK(cloud.normal(i).isZero());
-    CHECK(cloud.cov(i).topLeftCorner<3, 3>().isIdentity());
-    CHECK(cloud.cov(i).row(3).isZero());
-    CHECK(cloud.cov(i).col(3).isZero());
+    CHECK(small_gicp::eigen_view(cloud.normal(i)).isZero());
+    CHECK(small_gicp::eigen_view(cloud.cov(i)).topLeftCorner<3, 3>().isIdentity());
+    CHECK(small_gicp::eigen_view(cloud.cov(i)).row(3).isZero());
+    CHECK(small_gicp::eigen_view(cloud.cov(i)).col(3).isZero());
   }
-  cloud.point(0).x() = std::numeric_limits<double>::quiet_NaN();
+  small_gicp::eigen_view(cloud.point(0)).x() = std::numeric_limits<double>::quiet_NaN();
   tree.count = 5;
   small_gicp::estimate_local_features<small_gicp::NormalCovarianceSetter<small_gicp::PointCloud>>(
     cloud, tree, 5, 0);
-  CHECK(cloud.normal(0).isZero());
-  CHECK(cloud.cov(0).topLeftCorner<3, 3>().isIdentity());
+  CHECK(small_gicp::eigen_view(cloud.normal(0)).isZero());
+  CHECK(small_gicp::eigen_view(cloud.cov(0)).topLeftCorner<3, 3>().isIdentity());
 }

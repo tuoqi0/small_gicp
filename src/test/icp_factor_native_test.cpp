@@ -36,7 +36,7 @@ template <typename Factor>
 void checkRejectedCorrespondences() {
   small_gicp::PointCloud source(std::vector<Eigen::Vector3d>{{0.1, 0.2, 0.3}});
   small_gicp::PointCloud target(std::vector<Eigen::Vector3d>{{0.2, 0.3, 0.4}});
-  target.normal(0) = Eigen::Vector4d(1, 2, 3, 0);
+  small_gicp::eigen_view(target.normal(0)) = Eigen::Vector4d(1, 2, 3, 0);
   small_gicp::UnsafeKdTree<small_gicp::PointCloud> tree(target);
   Factor factor;
   small_gicp::factor_detail::Hessian native_hessian{};
@@ -80,7 +80,7 @@ void checkPoseRecovery() {
   small_gicp::PointCloud target(points), source(scan);
   // Non-axis-aligned weights exercise the original componentwise normal rule.
   for (size_t i = 0; i < target.size(); ++i)
-    target.normal(i) = Eigen::Vector4d(0.3, -0.4, 0.5, 0);
+    small_gicp::eigen_view(target.normal(i)) = Eigen::Vector4d(0.3, -0.4, 0.5, 0);
   small_gicp::UnsafeKdTree<small_gicp::PointCloud> tree(target);
   small_gicp::Registration<Factor, small_gicp::SerialReduction> registration;
   registration.optimizer.max_iterations = 50;
@@ -112,7 +112,7 @@ TEST_CASE("native ICP equations and trial-pose error match original Eigen formul
     auto gradient = small_gicp::eigen_view(native_gradient);
     double error = 0;
     REQUIRE(factor.linearize(target, source, tree, small_gicp::native_transform(transform), 0, Accept{}, &native_hessian, &native_gradient, &error));
-    const Eigen::Vector4d residual = target.point(0) - transform * source.point(0);
+    const Eigen::Vector4d residual = small_gicp::eigen_view(target.point(0)) - transform * small_gicp::eigen_view(source.point(0));
     Eigen::Matrix<double, 4, 6> jacobian = Eigen::Matrix<double, 4, 6>::Zero();
     jacobian.topLeftCorner<3, 3>() = transform.linear() * small_gicp::skew(point);
     jacobian.topRightCorner<3, 3>() = -transform.linear();
@@ -121,7 +121,7 @@ TEST_CASE("native ICP equations and trial-pose error match original Eigen formul
     CHECK(error == doctest::Approx(0.5 * residual.squaredNorm()).epsilon(1e-12));
     auto trial = transform;
     trial.translation() += Eigen::Vector3d(0.3, -0.1, 0.2);
-    const Eigen::Vector4d trial_residual = target.point(0) - trial * source.point(0);
+    const Eigen::Vector4d trial_residual = small_gicp::eigen_view(target.point(0)) - trial * small_gicp::eigen_view(source.point(0));
     CHECK(factor.error(target, source, small_gicp::native_transform(trial)) == doctest::Approx(0.5 * trial_residual.squaredNorm()).epsilon(1e-12));
   }
 }
@@ -138,7 +138,7 @@ TEST_CASE("native normal-weighted ICP preserves componentwise not scalar plane e
     small_gicp::PointCloud source(std::vector<Eigen::Vector3d>{point});
     small_gicp::PointCloud target(std::vector<Eigen::Vector3d>{
         transform * point + Eigen::Vector3d(0.03, -0.04, 0.05)});
-    target.normal(0) = Eigen::Vector4d(0.3, -0.4, 0.5, 0);
+    small_gicp::eigen_view(target.normal(0)) = Eigen::Vector4d(0.3, -0.4, 0.5, 0);
     small_gicp::UnsafeKdTree<small_gicp::PointCloud> tree(target);
     small_gicp::PointToPlaneICPFactor factor;
     small_gicp::factor_detail::Hessian native_hessian{};
@@ -147,8 +147,8 @@ TEST_CASE("native normal-weighted ICP preserves componentwise not scalar plane e
     auto gradient = small_gicp::eigen_view(native_gradient);
     double error = 0;
     REQUIRE(factor.linearize(target, source, tree, small_gicp::native_transform(transform), 0, Accept{}, &native_hessian, &native_gradient, &error));
-    const Eigen::Vector4d normal = target.normal(0);
-    const Eigen::Vector4d residual = target.point(0) - transform * source.point(0);
+    const Eigen::Vector4d normal = small_gicp::eigen_view(target.normal(0));
+    const Eigen::Vector4d residual = small_gicp::eigen_view(target.point(0)) - transform * small_gicp::eigen_view(source.point(0));
     const Eigen::Vector4d weighted = normal.array() * residual.array();
     Eigen::Matrix<double, 4, 6> jacobian = Eigen::Matrix<double, 4, 6>::Zero();
     jacobian.topLeftCorner<3, 3>() = normal.head<3>().asDiagonal() * transform.linear() * small_gicp::skew(point);
@@ -159,7 +159,7 @@ TEST_CASE("native normal-weighted ICP preserves componentwise not scalar plane e
     CHECK(std::abs(error - 0.5 * std::pow(normal.dot(residual), 2)) > 1e-4);
     auto trial = transform;
     trial.translation() += Eigen::Vector3d(0.3, -0.1, 0.2);
-    const Eigen::Vector4d trial_residual = target.point(0) - trial * source.point(0);
+    const Eigen::Vector4d trial_residual = small_gicp::eigen_view(target.point(0)) - trial * small_gicp::eigen_view(source.point(0));
     const Eigen::Vector4d trial_weighted = normal.array() * trial_residual.array();
     CHECK(factor.error(target, source, small_gicp::native_transform(trial)) == doctest::Approx(0.5 * trial_weighted.squaredNorm()).epsilon(1e-12));
   }
@@ -178,7 +178,7 @@ TEST_CASE("native ICP factors retain iterative pose recovery") {
 TEST_CASE("native normal-weighted ICP retains zero-normal behavior") {
   small_gicp::PointCloud source(std::vector<Eigen::Vector3d>{{1, 2, 3}});
   small_gicp::PointCloud target(std::vector<Eigen::Vector3d>{{1.1, 2.1, 3.1}});
-  target.normal(0).setZero();
+  small_gicp::eigen_view(target.normal(0)).setZero();
   small_gicp::UnsafeKdTree<small_gicp::PointCloud> tree(target);
   small_gicp::PointToPlaneICPFactor factor;
   small_gicp::factor_detail::Hessian native_hessian{};

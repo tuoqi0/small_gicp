@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 #ifdef BUILD_WITH_FAST_GICP
 
 #include <small_gicp/benchmark/benchmark_odom.hpp>
@@ -27,7 +28,7 @@ public:
     auto points_pcl = pcl::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
     points_pcl->resize(points->size());
     for (size_t i = 0; i < points->size(); i++) {
-      points_pcl->at(i).getVector4fMap() = points->point(i).template cast<float>();
+      points_pcl->at(i).getVector4fMap() = small_gicp::eigen_view(points->point(i)).template cast<float>();
     }
 
     Stopwatch sw;

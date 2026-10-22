@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 #pragma once
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 
 #include <small_gicp/ann/kdtree.hpp>
 #include <small_gicp/ann/gaussian_voxelmap.hpp>

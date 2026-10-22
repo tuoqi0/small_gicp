@@ -3,6 +3,11 @@
 #pragma once
 
 #include <memory>
+#include <cstdint>
+#include <limits>
+#include <algorithm>
+#include <numeric>
+#include <math/fixed_matrix_ops.h>
 #include <random>
 #include <iostream>
 #include <unordered_map>
@@ -21,6 +26,8 @@ namespace small_gicp {
 /// @return           Downsampled points
 template <typename InputPointCloud, typename OutputPointCloud = InputPointCloud>
 std::shared_ptr<OutputPointCloud> voxelgrid_sampling(const InputPointCloud& points, double leaf_size) {
+  using earth::mantle::math::operator*;
+  using earth::mantle::math::operator+;
   if (traits::size(points) == 0) {
     return std::make_shared<OutputPointCloud>();
   }
@@ -34,8 +41,9 @@ std::shared_ptr<OutputPointCloud> voxelgrid_sampling(const InputPointCloud& poin
 
   std::vector<std::pair<std::uint64_t, size_t>> coord_pt(traits::size(points));
   for (size_t i = 0; i < traits::size(points); i++) {
-    const Eigen::Array4i coord = fast_floor(traits::point(points, i) * inv_leaf_size) + coord_offset;
-    if ((coord < 0).any() || (coord > coord_bit_mask).any()) {
+    auto coord = fast_floor(traits::point_matrix(points, i) * inv_leaf_size);
+    for (int& value : coord) value += coord_offset;
+    if (std::any_of(coord.begin(), coord.end(), [=](int value) { return value < 0 || value > static_cast<int>(coord_bit_mask); })) {
       std::cerr << "warning: voxel coord is out of range!!" << std::endl;
       coord_pt[i] = {invalid_coord, i};
       continue;
@@ -57,21 +65,21 @@ std::shared_ptr<OutputPointCloud> voxelgrid_sampling(const InputPointCloud& poin
   traits::resize(*downsampled, traits::size(points));
 
   size_t num_points = 0;
-  Eigen::Vector4d sum_pt = traits::point(points, coord_pt.front().second);
+  earth::mantle::collection::Matrix<double, 4, 1> sum_pt = traits::point_matrix(points, coord_pt.front().second);
   for (size_t i = 1; i < traits::size(points); i++) {
     if (coord_pt[i].first == invalid_coord) {
       continue;
     }
 
     if (coord_pt[i - 1].first != coord_pt[i].first) {
-      traits::set_point(*downsampled, num_points++, sum_pt / sum_pt.w());
-      sum_pt.setZero();
+      traits::set_point(*downsampled, num_points++, traits::normalized_point(sum_pt));
+      sum_pt = {};
     }
 
-    sum_pt += traits::point(points, coord_pt[i].second);
+    sum_pt = sum_pt + traits::point_matrix(points, coord_pt[i].second);
   }
 
-  traits::set_point(*downsampled, num_points++, sum_pt / sum_pt.w());
+  traits::set_point(*downsampled, num_points++, traits::normalized_point(sum_pt));
   traits::resize(*downsampled, num_points);
 
   return downsampled;

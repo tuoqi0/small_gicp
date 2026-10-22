@@ -1,6 +1,7 @@
 #include <unordered_set>
 
 #include <robot_core/test/doctest.h>
+#include <small_gicp/util/eigen.hpp>
 #include <string>
 #include <cmath>
 #include <pcl/point_types.h>
@@ -146,7 +147,9 @@ TEST_CASE_FIXTURE(DownsamplingTest, "DownsamplingTest.RandamSamplingTest") {
 
         std::unordered_set<size_t> indices;
         for (size_t i = 0; i < N; i++) {
-          const auto found = std::find_if(downsampled->points.begin(), downsampled->points.end(), [&](const auto& p) { return (p - result->points[i]).norm() < 1.0e-6; });
+          const auto found = std::find_if(downsampled->points.begin(), downsampled->points.end(), [&](const auto& p) {
+            return (small_gicp::eigen_view(p) - small_gicp::eigen_view(result->points[i])).norm() < 1.0e-6;
+          });
           CHECK_MESSAGE((found) != (downsampled->points.end()), ("Existence check (small): " + parameter));
 
           const size_t index = std::distance(downsampled->points.begin(), found);

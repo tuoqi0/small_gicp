@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 #include <random>
 
 #include <robot_core/test/doctest.h>
@@ -31,15 +32,15 @@ public:
     points_pcl = pcl::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
     points_pcl->resize(points->size());
     for (size_t i = 0; i < points->size(); i++) {
-      points_pcl->at(i).getVector4fMap() = points->point(i).cast<float>();
+      points_pcl->at(i).getVector4fMap() = small_gicp::eigen_view(points->point(i)).cast<float>();
     }
 
     // Generate queries
     std::mt19937 mt;
     std::uniform_real_distribution<> udist(0.0, 1.0);
     for (size_t i = 0; i < 50; i++) {
-      queries.emplace_back(points->point(mt() % points->size()));
-      queries.emplace_back(points->point(mt() % points->size()) + Eigen::Vector4d(udist(mt), udist(mt), udist(mt), 0.0));
+      queries.emplace_back(small_gicp::eigen_view(points->point(mt() % points->size())));
+      queries.emplace_back(small_gicp::eigen_view(points->point(mt() % points->size())) + Eigen::Vector4d(udist(mt), udist(mt), udist(mt), 0.0));
       queries.emplace_back(Eigen::Vector4d(udist(mt) * 100.0, udist(mt) * 100.0, udist(mt) * 100.0, 1.0));
     }
 
@@ -58,7 +59,7 @@ public:
 
       std::priority_queue<IndexDist> queue;
       for (size_t pt_idx = 0; pt_idx < points->size(); pt_idx++) {
-        const double sq_dist = (points->point(pt_idx) - query).squaredNorm();
+        const double sq_dist = (small_gicp::eigen_view(points->point(pt_idx)) - query).squaredNorm();
         if (queue.size() < k) {
           queue.push({pt_idx, sq_dist});
         } else if (sq_dist < queue.top().dist) {
@@ -119,7 +120,7 @@ public:
 
       CHECK_MESSAGE((num_results) <= (k), ("num_neighbors must be less than or equal to k"));
       for (size_t j = 0; j < num_results; j++) {
-        const Eigen::Vector4d pt = traits::point(voxelmap, indices[j]);
+        const Eigen::Vector4d pt = small_gicp::eigen_matrix(traits::point(voxelmap, indices[j]));
         const double sq_dist = (pt - query).squaredNorm();
         CHECK(std::abs(static_cast<double>(sq_dists[j]) - static_cast<double>(sq_dist)) <= (1e-3));
       }
@@ -131,7 +132,7 @@ public:
 
       CHECK_MESSAGE((found) <= (1), ("num_neighbors must be less than or equal to 1"));
       if (found) {
-        const Eigen::Vector4d pt = traits::point(voxelmap, nn_index);
+        const Eigen::Vector4d pt = small_gicp::eigen_matrix(traits::point(voxelmap, nn_index));
         const double sq_dist = (pt - query).squaredNorm();
         CHECK(std::abs(static_cast<double>(nn_sq_dist) - static_cast<double>(sq_dist)) <= (1e-3));
         hit_count++;
@@ -218,9 +219,9 @@ TEST_CASE_FIXTURE(KdTreeTest, "KdTreeTest.KnnTest") {
         CHECK((indices.size()) == (voxel_covs.size()));
 
         for (size_t i = 0; i < indices.size(); i++) {
-          CHECK(std::abs(static_cast<double>((voxel_points[i] - traits::point(*voxelmap, indices[i])).squaredNorm()) - static_cast<double>(0.0)) <= (1e-6));
-          CHECK(std::abs(static_cast<double>((voxel_normals[i] - traits::normal(*voxelmap, indices[i])).squaredNorm()) - static_cast<double>(0.0)) <= (1e-6));
-          CHECK(std::abs(static_cast<double>((voxel_covs[i] - traits::cov(*voxelmap, indices[i])).squaredNorm()) - static_cast<double>(0.0)) <= (1e-6));
+          CHECK(std::abs(static_cast<double>((small_gicp::eigen_view(voxel_points[i]) - small_gicp::eigen_matrix(traits::point(*voxelmap, indices[i]))).squaredNorm()) - static_cast<double>(0.0)) <= (1e-6));
+          CHECK(std::abs(static_cast<double>((small_gicp::eigen_view(voxel_normals[i]) - small_gicp::eigen_matrix(traits::normal(*voxelmap, indices[i]))).squaredNorm()) - static_cast<double>(0.0)) <= (1e-6));
+          CHECK(std::abs(static_cast<double>((small_gicp::eigen_view(voxel_covs[i]) - small_gicp::eigen_matrix(traits::cov(*voxelmap, indices[i]))).squaredNorm()) - static_cast<double>(0.0)) <= (1e-6));
         }
 
         auto voxelmap_pcl = std::make_shared<IncrementalVoxelMap<FlatContainer<>>>(1.0);
@@ -239,8 +240,8 @@ TEST_CASE_FIXTURE(KdTreeTest, "KdTreeTest.KnnTest") {
         CHECK((indices.size()) == (voxel_covs.size()));
 
         for (size_t i = 0; i < indices.size(); i++) {
-          CHECK(std::abs(static_cast<double>((voxel_points[i] - traits::point(*voxelmap, indices[i])).squaredNorm()) - static_cast<double>(0.0)) <= (1e-6));
-          CHECK(std::abs(static_cast<double>((voxel_covs[i] - traits::cov(*voxelmap, indices[i])).squaredNorm()) - static_cast<double>(0.0)) <= (1e-6));
+          CHECK(std::abs(static_cast<double>((small_gicp::eigen_view(voxel_points[i]) - small_gicp::eigen_matrix(traits::point(*voxelmap, indices[i]))).squaredNorm()) - static_cast<double>(0.0)) <= (1e-6));
+          CHECK(std::abs(static_cast<double>((small_gicp::eigen_view(voxel_covs[i]) - small_gicp::eigen_matrix(traits::cov(*voxelmap, indices[i]))).squaredNorm()) - static_cast<double>(0.0)) <= (1e-6));
         }
       } else {
         throw std::runtime_error("Invalid method: " + method);

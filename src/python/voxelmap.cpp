@@ -6,6 +6,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include <pybind11/eigen.h>
+#include <small_gicp/util/eigen.hpp>
 #include <pybind11/functional.h>
 
 #include <small_gicp/points/point_cloud.hpp>
@@ -56,7 +57,7 @@ auto define_class(py::module& m, const std::string& name) {
         )pbdoc")
     .def(
       "insert",
-      [](VoxelMap& voxelmap, const PointCloud& points, const Eigen::Matrix4d& T) { voxelmap.insert(points, Eigen::Isometry3d(T)); },
+      [](VoxelMap& voxelmap, const PointCloud& points, const Eigen::Matrix4d& T) { voxelmap.insert(points, native_transform(Eigen::Isometry3d(T))); },
       py::arg("points"),
       py::arg("T") = Eigen::Matrix4d::Identity(),
       R"pbdoc(
@@ -97,7 +98,9 @@ auto define_class(py::module& m, const std::string& name) {
       "voxel_points",
       [](const VoxelMap& voxelmap) -> Eigen::MatrixXd {
         auto points = traits::voxel_points(voxelmap);
-        return Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(points[0].data(), points.size(), 4);
+        Eigen::MatrixXd output(points.size(), 4);
+        for (size_t i = 0; i < points.size(); ++i) output.row(i) = eigen_view(points[i]).transpose();
+        return output;
       },
       R"pbdoc(
         Get the voxel points.
@@ -113,7 +116,9 @@ auto define_class(py::module& m, const std::string& name) {
       "voxel_normals",
       [](const VoxelMap& voxelmap) -> Eigen::MatrixXd {
         auto normals = traits::voxel_normals(voxelmap);
-        return Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(normals[0].data(), normals.size(), 4);
+        Eigen::MatrixXd output(normals.size(), 4);
+        for (size_t i = 0; i < normals.size(); ++i) output.row(i) = eigen_view(normals[i]).transpose();
+        return output;
       },
       R"pbdoc(
         Get the voxel normals.
@@ -130,15 +135,21 @@ auto define_class(py::module& m, const std::string& name) {
       "voxel_covs",
       [](const VoxelMap& voxelmap) -> Eigen::MatrixXd {
         auto covs = traits::voxel_covs(voxelmap);
-        return Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(covs[0].data(), covs.size(), 16);
+        Eigen::MatrixXd output(covs.size(), 16);
+        for (size_t i = 0; i < covs.size(); ++i) {
+          const Eigen::Matrix4d covariance = eigen_view(covs[i]);
+          // Keep the old Eigen column-major flattening and Nx16 Python shape.
+          output.row(i) = Eigen::Map<const Eigen::Matrix<double, 1, 16>>(covariance.data());
+        }
+        return output;
       },
       R"pbdoc(
         Get the voxel normals.
 
         Returns
         -------
-        voxel_covs : list of numpy.ndarray
-            Voxel covariance matrices. (Nx4x4)
+        voxel_covs : numpy.ndarray
+            Voxel covariance matrices. (Nx16, each matrix flattened column-major)
         )pbdoc");
   }
 };

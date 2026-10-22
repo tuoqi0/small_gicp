@@ -5,7 +5,6 @@
 #include <memory>
 #include <array>
 #include <vector>
-#include <Eigen/Core>
 #include <collection/fixed_matrix.h>
 #include <small_gicp/points/traits.hpp>
 
@@ -20,11 +19,6 @@ public:
   using ConstPtr = std::shared_ptr<const PointCloud>;
   using NativePoint = earth::mantle::collection::Matrix<double, 4, 1>;
   using NativeCovariance = earth::mantle::collection::Matrix<double, 4, 4>;
-  using PointView = Eigen::Map<Eigen::Vector4d>;
-  using ConstPointView = Eigen::Map<const Eigen::Vector4d>;
-  using PackedCovariance = Eigen::Matrix<double, 4, 4, Eigen::RowMajor>;
-  using CovarianceView = Eigen::Map<PackedCovariance>;
-  using ConstCovarianceView = Eigen::Map<const PackedCovariance>;
 
   /// @brief Constructor
   PointCloud() {}
@@ -35,11 +29,13 @@ public:
 
   /// @brief Constructor
   /// @param points  Points to initialize the point cloud
-  template <typename T, int D, typename Allocator>
-  explicit PointCloud(const std::vector<Eigen::Matrix<T, D, 1>, Allocator>& points) {
+  template <typename Point, typename Allocator>
+  explicit PointCloud(const std::vector<Point, Allocator>& points) {
     this->resize(points.size());
     for (size_t i = 0; i < points.size(); i++) {
-      this->point(i) << points[i].template cast<double>().template head<3>(), 1.0;
+      this->points[i] = NativePoint::from({static_cast<double>(traits::detail::coordinate(points[i], 0)),
+          static_cast<double>(traits::detail::coordinate(points[i], 1)),
+          static_cast<double>(traits::detail::coordinate(points[i], 2)), 1.0});
     }
   }
 
@@ -61,32 +57,32 @@ public:
   }
 
   /// @brief Get i-th point.
-  PointView point(size_t i) { return PointView(points[i].raw_pointer()); }
+  NativePoint& point(size_t i) { return points[i]; }
 
   /// @brief Get i-th normal.
-  PointView normal(size_t i) { return PointView(normals[i].raw_pointer()); }
+  NativePoint& normal(size_t i) { return normals[i]; }
 
   /// @brief Get i-th covariance.
-  CovarianceView cov(size_t i) { return CovarianceView(covs[i].raw_pointer()); }
+  NativeCovariance& cov(size_t i) { return covs[i]; }
 
   /// @brief Get i-th point (const).
-  ConstPointView point(size_t i) const {
-    return ConstPointView(points[i].raw_pointer());
+  const NativePoint& point(size_t i) const {
+    return points[i];
   }
 
   /// @brief Get i-th normal (const).
-  ConstPointView normal(size_t i) const {
-    return ConstPointView(normals[i].raw_pointer());
+  const NativePoint& normal(size_t i) const {
+    return normals[i];
   }
 
   /// @brief Get i-th covariance (const).
-  ConstCovarianceView cov(size_t i) const {
-    return ConstCovarianceView(covs[i].raw_pointer());
+  const NativeCovariance& cov(size_t i) const {
+    return covs[i];
   }
 
 public:
-  // Native buffers own all data. Getter views borrow storage and, like the
-  // previous references, must not survive resize/destruction of their buffer.
+  // Native buffers own all data. Getter references must not survive resize or
+  // destruction of their buffer; no third-party matrix view is stored here.
   // Generic traits below return values to retain their previous copy semantics.
   std::vector<NativePoint> points;      ///< Point coordinates (x, y, z, 1)
   std::vector<NativePoint> normals;     ///< Point normals (nx, ny, nz, 0)
@@ -105,19 +101,27 @@ struct Traits<PointCloud> {
   static bool has_normals(const Points& points) { return !points.normals.empty(); }
   static bool has_covs(const Points& points) { return !points.covs.empty(); }
 
-  static Eigen::Vector4d point(const Points& points, size_t i) { return points.point(i); }
-  static Eigen::Vector4d normal(const Points& points, size_t i) { return points.normal(i); }
-  static Eigen::Matrix4d cov(const Points& points, size_t i) { return points.cov(i); }
+  static Points::NativePoint point(const Points& points, size_t i) { return points.point(i); }
+  static Points::NativePoint normal(const Points& points, size_t i) { return points.normal(i); }
+  static Points::NativeCovariance cov(const Points& points, size_t i) { return points.cov(i); }
 
   static void resize(Points& points, size_t n) { points.resize(n); }
-  static void set_point(Points& points, size_t i, const Eigen::Vector4d& pt) { points.point(i) = pt; }
-  static void set_normal(Points& points, size_t i, const Eigen::Vector4d& n) { points.normal(i) = n; }
-  static void set_cov(Points& points, size_t i, const Eigen::Matrix4d& cov) { points.cov(i) = cov; }
-  static void set_normal(Points& points, size_t i, const std::array<double, 4>& normal) {
-    points.normal(i) = Eigen::Map<const Eigen::Vector4d>(normal.data());
+  template <typename Point>
+  static void set_point(Points& points, size_t i, const Point& pt) {
+    points.point(i) = Points::NativePoint::from({detail::coordinate(pt, 0), detail::coordinate(pt, 1),
+        detail::coordinate(pt, 2), detail::coordinate(pt, 3)});
   }
-  static void set_cov(Points& points, size_t i, const Points::NativeCovariance& cov) {
-    points.covs[i] = cov;
+  template <typename Point>
+  static void set_normal(Points& points, size_t i, const Point& normal) {
+    points.normal(i) = Points::NativePoint::from({detail::coordinate(normal, 0), detail::coordinate(normal, 1),
+        detail::coordinate(normal, 2), detail::coordinate(normal, 3)});
+  }
+  template <typename Covariance>
+  static void set_cov(Points& points, size_t i, const Covariance& cov) {
+    Points::NativeCovariance copy{};
+    for (size_t row = 0; row < 4; ++row)
+      for (size_t col = 0; col < 4; ++col) copy[row][col] = detail::coefficient(cov, row, col);
+    points.covs[i] = copy;
   }
 };
 

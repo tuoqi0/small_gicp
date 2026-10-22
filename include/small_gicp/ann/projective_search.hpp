@@ -3,7 +3,12 @@
 #pragma once
 
 #include <cmath>
-#include <Eigen/Core>
+#include <array>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <vector>
+#include <small_gicp/ann/traits.hpp>
 #include <small_gicp/points/traits.hpp>
 #include <small_gicp/ann/knn_result.hpp>
 
@@ -13,16 +18,19 @@ namespace small_gicp {
 struct EquirectangularProjection {
 public:
   /// @brief Project the point into the normalized image coordinates. (u, v) in ([0, 1], [0, 1])
-  Eigen::Vector2d operator()(const Eigen::Vector3d& pt_3d) const {
-    if (pt_3d.squaredNorm() < 1e-3) {
-      return Eigen::Vector2d(0.5, 0.5);
-    }
-
-    const Eigen::Vector3d bearing = pt_3d.normalized();
+  template <typename Point>
+  std::array<double, 2> operator()(const Point& pt_3d) const {
+    const double x = traits::detail::coordinate(pt_3d, 0);
+    const double y = traits::detail::coordinate(pt_3d, 1);
+    const double z = traits::detail::coordinate(pt_3d, 2);
+    const double squared_norm = (x * x + y * y) + z * z;
+    constexpr double kMinSquaredNorm = 1e-3;
+    if (squared_norm < kMinSquaredNorm) return {{0.5, 0.5}};
+    const double norm = std::sqrt(squared_norm);
+    const std::array<double, 3> bearing{{x / norm, y / norm, z / norm}};
     const double lat = -std::asin(bearing[1]);
     const double lon = std::atan2(bearing[0], bearing[2]);
-
-    return Eigen::Vector2d(lon / (2.0 * M_PI) + 0.5, lat / M_PI + 0.5);
+    return {{lon / (2.0 * M_PI) + 0.5, lat / M_PI + 0.5}};
   };
 };
 
@@ -46,20 +54,18 @@ public:
   /// @param width    Index map width
   /// @param height   Index map height
   /// @param points   Target point cloud
-  UnsafeProjectiveSearch(int width, int height, const PointCloud& points) : points(points), index_map(height, width), search_window_h(10), search_window_v(5) {
-    index_map.setConstant(invalid_index);
+  UnsafeProjectiveSearch(int width, int height, const PointCloud& points) : points(points), index_map(static_cast<size_t>(height) * width, invalid_index), width_(width), height_(height), search_window_h(10), search_window_v(5) {
 
     Projection project;
     for (size_t i = 0; i < traits::size(points); ++i) {
-      const Eigen::Vector4d pt = traits::point(points, i);
-      const Eigen::Vector2d uv = project(pt.head<3>());
-      const int u = uv[0] * index_map.cols();
-      const int v = uv[1] * index_map.rows();
+      const auto uv = project(traits::point(points, i));
+      const int u = uv[0] * width_;
+      const int v = uv[1] * height_;
 
-      if (u < 0 || u >= index_map.cols() || v < 0 || v >= index_map.rows()) {
+      if (u < 0 || u >= width_ || v < 0 || v >= height_) {
         continue;
       }
-      index_map(v, u) = i;
+      index_map[static_cast<size_t>(v) * width_ + u] = i;
     }
   }
 
@@ -69,7 +75,8 @@ public:
   /// @param k_sq_dists   Squared distance to the nearest neighbor (uninitialized if not found)
   /// @param setting      KNN search setting
   /// @return             Number of found neighbors (0 or 1)
-  size_t nearest_neighbor_search(const Eigen::Vector4d& query, size_t* k_indices, double* k_sq_dists, const KnnSetting& setting = KnnSetting()) const {
+  template <typename Query>
+  size_t nearest_neighbor_search(const Query& query, size_t* k_indices, double* k_sq_dists, const KnnSetting& setting = KnnSetting()) const {
     return knn_search<1>(query, k_indices, k_sq_dists, setting);
   }
 
@@ -80,7 +87,8 @@ public:
   /// @param  k_sq_dists  Squared distances to neighbors (sorted in ascending order)
   /// @param  setting     KNN search setting
   /// @return             Number of found neighbors
-  size_t knn_search(const Eigen::Vector4d& query, int k, size_t* k_indices, double* k_sq_dists, const KnnSetting& setting = KnnSetting()) const {
+  template <typename Query>
+  size_t knn_search(const Query& query, int k, size_t* k_indices, double* k_sq_dists, const KnnSetting& setting = KnnSetting()) const {
     KnnResult<-1> result(k_indices, k_sq_dists, k);
     knn_search(query, result, setting);
     return result.num_found();
@@ -92,42 +100,42 @@ public:
   /// @param k_sq_dists  Squared distances to neighbors (sorted in ascending order)
   /// @param setting     KNN search setting
   /// @return            Number of found neighbors
-  template <int N>
-  size_t knn_search(const Eigen::Vector4d& query, size_t* k_indices, double* k_sq_dists, const KnnSetting& setting = KnnSetting()) const {
+  template <int N, typename Query>
+  size_t knn_search(const Query& query, size_t* k_indices, double* k_sq_dists, const KnnSetting& setting = KnnSetting()) const {
     KnnResult<N> result(k_indices, k_sq_dists);
     knn_search(query, result, setting);
     return result.num_found();
   }
 
 private:
-  template <typename Result>
-  void knn_search(const Eigen::Vector4d& query, Result& result, const KnnSetting& setting) const {
+  template <typename Query, typename Result>
+  void knn_search(const Query& query, Result& result, const KnnSetting& setting) const {
     BorderModeH border_h;
     BorderModeV border_v;
 
     Projection project;
-    const Eigen::Vector2d uv = project(query.head<3>());
-    const int u = uv[0] * index_map.cols();
-    const int v = uv[1] * index_map.rows();
+    const auto uv = project(query);
+    const int u = uv[0] * width_;
+    const int v = uv[1] * height_;
 
     for (int du = -search_window_h; du <= search_window_h; du++) {
-      const int u_clamped = border_h(u + du, index_map.cols());
-      if (u_clamped < 0 || u_clamped >= index_map.cols()) {
+      const int u_clamped = border_h(u + du, width_);
+      if (u_clamped < 0 || u_clamped >= width_) {
         continue;
       }
 
       for (int dv = -search_window_v; dv <= search_window_v; dv++) {
-        const int v_clamped = border_v(v + dv, index_map.rows());
-        if (v_clamped < 0 || v_clamped >= index_map.rows()) {
+        const int v_clamped = border_v(v + dv, height_);
+        if (v_clamped < 0 || v_clamped >= height_) {
           continue;
         }
 
-        const auto index = index_map(v_clamped, u_clamped);
+        const auto index = index_map[static_cast<size_t>(v_clamped) * width_ + u_clamped];
         if (index == invalid_index) {
           continue;
         }
 
-        const double sq_dist = (traits::point(points, index) - query).squaredNorm();
+        const double sq_dist = ann_detail::squared_distance(traits::point(points, index), query);
         result.push(index, sq_dist);
 
         if (setting.fulfilled(result)) {
@@ -141,7 +149,9 @@ public:
   static constexpr std::uint32_t invalid_index = std::numeric_limits<std::uint32_t>::max();
 
   const PointCloud& points;
-  Eigen::Matrix<std::uint32_t, -1, -1> index_map;
+  std::vector<std::uint32_t> index_map;
+  const int width_;
+  const int height_;
 
   int search_window_h;
   int search_window_v;
@@ -162,7 +172,8 @@ public:
   /// @param  k_sq_dists  Squared distance to the nearest neighbor (uninitialized if not found)
   /// @param  setting     KNN search setting
   /// @return             Number of found neighbors (0 or 1)
-  size_t nearest_neighbor_search(const Eigen::Vector4d& query, size_t* k_indices, double* k_sq_dists, const KnnSetting& setting = KnnSetting()) const {
+  template <typename Query>
+  size_t nearest_neighbor_search(const Query& query, size_t* k_indices, double* k_sq_dists, const KnnSetting& setting = KnnSetting()) const {
     return search.nearest_neighbor_search(query, k_indices, k_sq_dists, setting);
   }
 
@@ -173,7 +184,8 @@ public:
   /// @param  k_sq_dists  Squared distances to neighbors (sorted in ascending order)
   /// @param  setting     KNN search setting
   /// @return             Number of found neighbors
-  size_t knn_search(const Eigen::Vector4d& query, size_t k, size_t* k_indices, double* k_sq_dists, const KnnSetting& setting = KnnSetting()) const {
+  template <typename Query>
+  size_t knn_search(const Query& query, size_t k, size_t* k_indices, double* k_sq_dists, const KnnSetting& setting = KnnSetting()) const {
     return search.knn_search(query, k, k_indices, k_sq_dists, setting);
   }
 
@@ -186,29 +198,33 @@ namespace traits {
 
 template <typename PointCloud, typename Projection, typename BorderModeH, typename BorderModeV>
 struct Traits<UnsafeProjectiveSearch<PointCloud, Projection, BorderModeH, BorderModeV>> {
+  template <typename Query>
   static size_t nearest_neighbor_search(
     const UnsafeProjectiveSearch<PointCloud, Projection, BorderModeH, BorderModeV>& tree,
-    const Eigen::Vector4d& point,
+    const Query& point,
     size_t* k_indices,
     double* k_sq_dists) {
     return tree.nearest_neighbor_search(point, k_indices, k_sq_dists);
   }
 
+  template <typename Query>
   static size_t
-  knn_search(const UnsafeProjectiveSearch<PointCloud, Projection, BorderModeH, BorderModeV>& tree, const Eigen::Vector4d& point, size_t k, size_t* k_indices, double* k_sq_dists) {
+  knn_search(const UnsafeProjectiveSearch<PointCloud, Projection, BorderModeH, BorderModeV>& tree, const Query& point, size_t k, size_t* k_indices, double* k_sq_dists) {
     return tree.knn_search(point, k, k_indices, k_sq_dists);
   }
 };
 
 template <typename PointCloud, typename Projection, typename BorderModeH, typename BorderModeV>
 struct Traits<ProjectiveSearch<PointCloud, Projection, BorderModeH, BorderModeV>> {
+  template <typename Query>
   static size_t
-  nearest_neighbor_search(const ProjectiveSearch<PointCloud, Projection, BorderModeH, BorderModeV>& tree, const Eigen::Vector4d& point, size_t* k_indices, double* k_sq_dists) {
+  nearest_neighbor_search(const ProjectiveSearch<PointCloud, Projection, BorderModeH, BorderModeV>& tree, const Query& point, size_t* k_indices, double* k_sq_dists) {
     return tree.nearest_neighbor_search(point, k_indices, k_sq_dists);
   }
 
+  template <typename Query>
   static size_t
-  knn_search(const ProjectiveSearch<PointCloud, Projection, BorderModeH, BorderModeV>& tree, const Eigen::Vector4d& point, size_t k, size_t* k_indices, double* k_sq_dists) {
+  knn_search(const ProjectiveSearch<PointCloud, Projection, BorderModeH, BorderModeV>& tree, const Query& point, size_t k, size_t* k_indices, double* k_sq_dists) {
     return tree.knn_search(point, k, k_indices, k_sq_dists);
   }
 };

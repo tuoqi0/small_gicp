@@ -38,7 +38,7 @@ public:
     T_world_lidar = small_gicp::eigen_transform(result.T_target_source);
 
     // Insert points to the target voxel map
-    voxelmap->insert(*points, T_world_lidar);
+    voxelmap->insert(*points, small_gicp::native_transform(T_world_lidar));
 
     sw.stop();
     reg_times.push(sw.msec());

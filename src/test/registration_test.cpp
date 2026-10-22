@@ -39,7 +39,7 @@ public:
     target_pcl = pcl::make_shared<pcl::PointCloud<pcl::PointNormalCovariance>>();
     target_pcl->resize(target->size());
     for (size_t i = 0; i < target->size(); i++) {
-      target_pcl->at(i).getVector4fMap() = target->point(i).cast<float>();
+      target_pcl->at(i).getVector4fMap() = small_gicp::eigen_view(target->point(i)).cast<float>();
     }
     estimate_normals_covariances_omp(*target_pcl);
 
@@ -50,7 +50,7 @@ public:
     source_pcl = pcl::make_shared<pcl::PointCloud<pcl::PointNormalCovariance>>();
     source_pcl->resize(source->size());
     for (size_t i = 0; i < source->size(); i++) {
-      source_pcl->at(i).getVector4fMap() = source->point(i).cast<float>();
+      source_pcl->at(i).getVector4fMap() = small_gicp::eigen_view(source->point(i)).cast<float>();
     }
     estimate_normals_covariances_omp(*source_pcl);
 
@@ -86,7 +86,7 @@ public:
 
       shifted[i] = std::make_shared<PointCloud>(*source);
       for (size_t point_index = 0; point_index < source->size(); ++point_index)
-        shifted[i]->point(point_index) = T_shifted_source * source->point(point_index);
+        small_gicp::eigen_view(shifted[i]->point(point_index)) = T_shifted_source * small_gicp::eigen_view(source->point(point_index));
       estimate_normals_covariances_omp(*shifted[i]);
     }
 

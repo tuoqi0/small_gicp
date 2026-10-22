@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 #include <iostream>
@@ -219,9 +220,9 @@ void define_preprocess(py::module& m) {
       points->resize(points_numpy.rows());
       for (size_t i = 0; i < points_numpy.rows(); i++) {
         if (points_numpy.cols() == 3) {
-          points->point(i) << points_numpy.row(i).transpose(), 1.0;
+          small_gicp::eigen_view(points->point(i)) << points_numpy.row(i).transpose(), 1.0;
         } else {
-          points->point(i) << points_numpy.row(i).transpose();
+          small_gicp::eigen_view(points->point(i)) << points_numpy.row(i).transpose();
         }
       }
 

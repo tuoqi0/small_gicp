@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 #include <random>
 
 #include <robot_core/test/doctest.h>
@@ -109,11 +110,11 @@ public:
     };
 
     for (int i = 0; i < queries.size(); i++) {
-      const auto& query = queries.point(i);
+      const auto& query = small_gicp::eigen_view(queries.point(i));
 
       std::priority_queue<IndexDist> queue;
       for (int j = 0; j < target.size(); j++) {
-        const double sq_dist = (target.point(j) - query).squaredNorm();
+        const double sq_dist = (small_gicp::eigen_view(target.point(j)) - query).squaredNorm();
         if (queue.size() < k) {
           queue.push(IndexDist{j, sq_dist});
         } else if (sq_dist < queue.top().dist) {
@@ -146,7 +147,7 @@ public:
       std::vector<size_t> indices(1, 0);
       std::vector<double> sq_dists(1, 0.0);
 
-      const size_t num_results = traits::nearest_neighbor_search(kdtree, queries.point(i), indices.data(), sq_dists.data());
+      const size_t num_results = traits::nearest_neighbor_search(kdtree, small_gicp::eigen_view(queries.point(i)), indices.data(), sq_dists.data());
       indices.resize(num_results);
       sq_dists.resize(num_results);
 
@@ -166,7 +167,7 @@ public:
       std::vector<size_t> indices(k, 0);
       std::vector<double> sq_dists(k, 0.0);
 
-      const size_t num_results = traits::knn_search(kdtree, queries.point(i), k, indices.data(), sq_dists.data());
+      const size_t num_results = traits::knn_search(kdtree, small_gicp::eigen_view(queries.point(i)), k, indices.data(), sq_dists.data());
       indices.resize(num_results);
       sq_dists.resize(num_results);
 
@@ -188,7 +189,7 @@ public:
       CHECK_MESSAGE((k_sq_dists[i].size()) == (expected_n), (test_name));
 
       for (int j = 0; j < expected_n; j++) {
-        const double sq_dist = (prob->target->point(k_indices[i][j]) - prob->query->point(i)).squaredNorm();
+        const double sq_dist = (small_gicp::eigen_view(prob->target->point(k_indices[i][j])) - small_gicp::eigen_view(prob->query->point(i))).squaredNorm();
         CHECK_MESSAGE(std::abs(static_cast<double>(k_sq_dists[i][j]) - static_cast<double>(sq_dist)) <= (1e-3), (test_name));
         CHECK_MESSAGE(std::abs(static_cast<double>(k_sq_dists[i][j]) - static_cast<double>(prob->dists[i][j])) <= (1e-3), (test_name));
       }

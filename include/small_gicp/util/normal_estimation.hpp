@@ -25,8 +25,8 @@ struct NormalSetter {
     const double norm = std::sqrt(x * x + y * y + z * z);
     std::array<double, 4> normal{x / norm, y / norm, z / norm, 0.0};
     const auto point = traits::point(cloud, i);
-    const double facing = (point[0] * normal[0] + point[2] * normal[2]) +
-                          (point[1] * normal[1] + point[3] * normal[3]);
+    const double facing = (traits::detail::coordinate(point, 0) * normal[0] + traits::detail::coordinate(point, 2) * normal[2]) +
+                          (traits::detail::coordinate(point, 1) * normal[1] + traits::detail::coordinate(point, 3) * normal[3]);
     if (facing > 0) for (double& value : normal) value = -value;
     traits::set_normal(cloud, i, normal);
   }
@@ -91,9 +91,9 @@ void estimate_local_features(PointCloud& cloud, Tree& kdtree, int num_neighbors,
   for (size_t i = 0; i < n; i++) {
     const auto& pt = traits::point(cloud, k_indices[i]);
     for (size_t row = 0; row < 3; ++row) {
-      sum_points[row][0] += pt[row];
+      sum_points[row][0] += traits::detail::coordinate(pt, row);
       for (size_t col = 0; col <= row; ++col)
-        sum_cross[row][col] += pt[row] * pt[col];
+        sum_cross[row][col] += traits::detail::coordinate(pt, row) * traits::detail::coordinate(pt, col);
     }
   }
 

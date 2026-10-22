@@ -154,16 +154,16 @@ PointCloud2T to_impl(const PointCloud& cloud, const std::string& frame_id, const
   for (size_t i = 0; i < cloud.size(); i++) {
     uint8_t* pt = data_ptr + i * msg.point_step;
 
-    const Eigen::Vector4d& point = cloud.point(i);
-    *reinterpret_cast<float*>(pt + 0) = static_cast<float>(point.x());
-    *reinterpret_cast<float*>(pt + 4) = static_cast<float>(point.y());
-    *reinterpret_cast<float*>(pt + 8) = static_cast<float>(point.z());
+    const auto& point = cloud.point(i);
+    *reinterpret_cast<float*>(pt + 0) = static_cast<float>(point[0][0]);
+    *reinterpret_cast<float*>(pt + 4) = static_cast<float>(point[1][0]);
+    *reinterpret_cast<float*>(pt + 8) = static_cast<float>(point[2][0]);
 
     if (with_normals) {
-      const Eigen::Vector4d& normal = cloud.normal(i);
-      *reinterpret_cast<float*>(pt + 12) = static_cast<float>(normal.x());
-      *reinterpret_cast<float*>(pt + 16) = static_cast<float>(normal.y());
-      *reinterpret_cast<float*>(pt + 20) = static_cast<float>(normal.z());
+      const auto& normal = cloud.normal(i);
+      *reinterpret_cast<float*>(pt + 12) = static_cast<float>(normal[0][0]);
+      *reinterpret_cast<float*>(pt + 16) = static_cast<float>(normal[1][0]);
+      *reinterpret_cast<float*>(pt + 20) = static_cast<float>(normal[2][0]);
     }
   }
 

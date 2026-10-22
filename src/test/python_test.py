@@ -8,6 +8,19 @@ from scipy.spatial.transform import Rotation
 import small_gicp
 
 
+def test_empty_native_voxel_outputs_keep_array_shapes():
+  voxel_types = [small_gicp.IncrementalVoxelMap, small_gicp.IncrementalVoxelMapNormal,
+                 small_gicp.IncrementalVoxelMapCov, small_gicp.IncrementalVoxelMapNormalCov,
+                 small_gicp.GaussianVoxelMap]
+  for voxel_type in voxel_types:
+    voxelmap = voxel_type(0.5)
+    assert voxelmap.voxel_points().shape == (0, 4)
+    if hasattr(voxelmap, 'voxel_normals'):
+      assert voxelmap.voxel_normals().shape == (0, 4)
+    if hasattr(voxelmap, 'voxel_covs'):
+      assert voxelmap.voxel_covs().shape == (0, 16)
+
+
 # Basic registation example with small_gicp.PointCloud
 def example_small1(target_raw_numpy : numpy.ndarray, source_raw_numpy : numpy.ndarray):
   # Convert numpy arrays (Nx3 or Nx4) to small_gicp.PointCloud

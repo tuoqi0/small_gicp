@@ -50,9 +50,9 @@ struct traits::Traits<SequentialVoxelMapAccessor<VoxelMap>> {
   static bool has_normals(const SequentialVoxelMapAccessor<VoxelMap>& accessor) { return traits::has_normals(accessor.voxelmap); }
   static bool has_covs(const SequentialVoxelMapAccessor<VoxelMap>& accessor) { return traits::has_covs(accessor.voxelmap); }
 
-  static Eigen::Vector4d point(const SequentialVoxelMapAccessor<VoxelMap>& accessor, size_t i) { return traits::point(accessor.voxelmap, accessor.indices[i]); }
-  static Eigen::Vector4d normal(const SequentialVoxelMapAccessor<VoxelMap>& accessor, size_t i) { return traits::normal(accessor.voxelmap, accessor.indices[i]); }
-  static Eigen::Matrix4d cov(const SequentialVoxelMapAccessor<VoxelMap>& accessor, size_t i) { return traits::cov(accessor.voxelmap, accessor.indices[i]); }
+  static auto point(const SequentialVoxelMapAccessor<VoxelMap>& accessor, size_t i) { return traits::point(accessor.voxelmap, accessor.indices[i]); }
+  static auto normal(const SequentialVoxelMapAccessor<VoxelMap>& accessor, size_t i) { return traits::normal(accessor.voxelmap, accessor.indices[i]); }
+  static auto cov(const SequentialVoxelMapAccessor<VoxelMap>& accessor, size_t i) { return traits::cov(accessor.voxelmap, accessor.indices[i]); }
 };
 
 }  // namespace small_gicp

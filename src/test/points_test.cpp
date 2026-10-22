@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 #include <robot_core/test/doctest.h>
 #include <cmath>
 
@@ -27,18 +28,18 @@ void test_points(const std::vector<Eigen::Vector4d>& src_points, PointCloud& poi
     traits::set_normal(points, i, normals[i]);
     traits::set_cov(points, i, covs[i]);
 
-    CHECK(std::abs(static_cast<double>((traits::point(points, i) - src_points[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
-    CHECK(std::abs(static_cast<double>((traits::normal(points, i) - normals[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
-    CHECK(std::abs(static_cast<double>((traits::cov(points, i) - covs[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
+    CHECK(std::abs(static_cast<double>((small_gicp::eigen_matrix(traits::point(points, i)) - src_points[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
+    CHECK(std::abs(static_cast<double>((small_gicp::eigen_matrix(traits::normal(points, i)) - normals[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
+    CHECK(std::abs(static_cast<double>((small_gicp::eigen_matrix(traits::cov(points, i)) - covs[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
   }
 
   traits::resize(points, src_points.size() / 2);
   CHECK((traits::size(points)) == (src_points.size() / 2));
 
   for (size_t i = 0; i < traits::size(points); i++) {
-    CHECK(std::abs(static_cast<double>((traits::point(points, i) - src_points[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
-    CHECK(std::abs(static_cast<double>((traits::normal(points, i) - normals[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
-    CHECK(std::abs(static_cast<double>((traits::cov(points, i) - covs[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
+    CHECK(std::abs(static_cast<double>((small_gicp::eigen_matrix(traits::point(points, i)) - src_points[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
+    CHECK(std::abs(static_cast<double>((small_gicp::eigen_matrix(traits::normal(points, i)) - normals[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
+    CHECK(std::abs(static_cast<double>((small_gicp::eigen_matrix(traits::cov(points, i)) - covs[i]).norm()) - static_cast<double>(0.0)) <= (1e-3));
   }
 }
 

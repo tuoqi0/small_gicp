@@ -81,7 +81,8 @@ public:
     return traj;
   }
 
-  void update_model_points(const Eigen::Isometry3d& T, const std::vector<Eigen::Vector4d>& points) {
+  template <typename Point>
+  void update_model_points(const Eigen::Isometry3d& T, const std::vector<Point>& points) {
     if (!params.visualize) {
       return;
     }
@@ -92,7 +93,12 @@ public:
       async_sub = guik::async_viewer()->async_sub_viewer("model");
     }
 
-    async_sub.update_points("model", points, guik::Rainbow());
+    std::vector<Eigen::Vector4d> display_points;
+    display_points.reserve(points.size());
+    for (const auto& point : points)
+      display_points.emplace_back(traits::detail::coordinate(point, 0), traits::detail::coordinate(point, 1),
+          traits::detail::coordinate(point, 2), traits::detail::coordinate(point, 3));
+    async_sub.update_points("model", display_points, guik::Rainbow());
     async_sub.lookat(T.translation().cast<float>());
 #endif
   }

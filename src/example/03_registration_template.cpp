@@ -107,11 +107,14 @@ struct Traits<MyPointCloud> {
   // Resize the point cloud. This must retain the values of existing points.
   static void resize(MyPointCloud& points, size_t n) { points.resize(n); }
   // Set i-th point. pt = [x, y, z, 1.0].
-  static void set_point(MyPointCloud& points, size_t i, const Eigen::Vector4d& pt) { Eigen::Map<Eigen::Vector3d>(points[i].point.data()) = pt.head<3>(); }
+  template <typename Point>
+  static void set_point(MyPointCloud& points, size_t i, const Point& pt) {
+    points[i].point = {{detail::coordinate(pt, 0), detail::coordinate(pt, 1), detail::coordinate(pt, 2)}};
+  }
   // Set i-th normal. n = [nx, ny, nz, 0.0].
   template <typename Normal>
   static void set_normal(MyPointCloud& points, size_t i, const Normal& n) {
-    points[i].normal = {{n[0], n[1], n[2]}};
+    points[i].normal = {{detail::coordinate(n, 0), detail::coordinate(n, 1), detail::coordinate(n, 2)}};
   }
   // To feed this class to estimate_covariances(), the following setter is required additionally.
   // static void set_cov(MyPointCloud& points, size_t i, const Eigen::Matrix4d& cov);

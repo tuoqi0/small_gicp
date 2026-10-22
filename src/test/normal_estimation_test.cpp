@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 #include <robot_core/test/doctest.h>
 #include <string>
 #include <cmath>
@@ -30,7 +31,7 @@ public:
     points_pcl = pcl::make_shared<pcl::PointCloud<pcl::PointNormal>>();
     points_pcl->resize(points->size());
     for (size_t i = 0; i < points->size(); i++) {
-      points_pcl->at(i).getVector4fMap() = points->point(i).cast<float>();
+      points_pcl->at(i).getVector4fMap() = small_gicp::eigen_view(points->point(i)).cast<float>();
     }
 
     pcl::NormalEstimationOMP<pcl::PointNormal, pcl::PointNormal> normal_estimation;
@@ -46,7 +47,7 @@ public:
     }
 
     for (size_t i = 0; i < traits::size(points); i++) {
-      const Eigen::Vector4d normal = traits::normal(points, i);
+      const Eigen::Vector4d normal = small_gicp::eigen_matrix(traits::normal(points, i));
       CHECK_MESSAGE(std::abs(static_cast<double>(normal.w()) - static_cast<double>(0.0)) <= (1e-6), ("Last element must be zero"));
       CHECK_MESSAGE(std::abs(static_cast<double>(normal.norm()) - static_cast<double>(1.0)) <= (1e-6), ("Normal must be unit vector"));
 
@@ -63,7 +64,7 @@ public:
     }
 
     for (size_t i = 0; i < traits::size(points); i++) {
-      const Eigen::Matrix4d cov = traits::cov(points, i);
+      const Eigen::Matrix4d cov = small_gicp::eigen_matrix(traits::cov(points, i));
       CHECK_MESSAGE(std::abs(static_cast<double>(cov.bottomRows(1).norm()) - static_cast<double>(0.0)) <= (1e-6), ("Bottom row must be zero"));
       CHECK_MESSAGE(std::abs(static_cast<double>(cov.rightCols(1).norm()) - static_cast<double>(0.0)) <= (1e-6), ("Right column must be zero"));
 
@@ -73,7 +74,7 @@ public:
         }
       }
 
-      const double error = (cov - this->points->cov(i)).norm();
+      const double error = (cov - small_gicp::eigen_view(this->points->cov(i))).norm();
       CHECK_MESSAGE(std::abs(static_cast<double>(error) - static_cast<double>(0.0)) <= (1e-3), ("Covariance estimation error is too large"));
     }
     return true;

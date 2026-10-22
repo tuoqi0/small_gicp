@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 #include <iostream>
@@ -27,7 +28,7 @@ void define_kdtree(py::module& m) {
         points->resize(points_numpy.rows());
 
         for (int i = 0; i < points_numpy.rows(); i++) {
-          points->point(i) << points_numpy(i, 0), points_numpy(i, 1), points_numpy(i, 2), 1.0;
+          small_gicp::eigen_view(points->point(i)) << points_numpy(i, 0), points_numpy(i, 1), points_numpy(i, 2), 1.0;
         }
 
         return std::make_shared<KdTree<PointCloud>>(points, KdTreeBuilderOMP(num_threads));

@@ -71,6 +71,14 @@ const T& coefficient(const earth::mantle::collection::Matrix<T, Rows, Cols>& cov
 }
 }  // namespace detail
 
+// Preserve direct homogeneous division used by the existing voxel centroids.
+inline earth::mantle::collection::Matrix<double, 4, 1> normalized_point(
+    const earth::mantle::collection::Matrix<double, 4, 1>& sum) {
+  earth::mantle::collection::Matrix<double, 4, 1> result{};
+  for (size_t axis = 0; axis < 4; ++axis) result[axis][0] = sum[axis][0] / sum[3][0];
+  return result;
+}
+
 // Explicit point-cloud boundary. Native matrices pass by value, as the
 // original generic getters did; external layouts are read coordinate-wise.
 template <typename T>

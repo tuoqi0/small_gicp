@@ -206,10 +206,7 @@ private:
       // Compare the query point with all points in the leaf node.
       for (size_t i = node.node_type.lr.first; i < node.node_type.lr.last; i++) {
         const auto point = traits::point(points, indices[i]);
-        const double dx = point[0] - query[0], dy = point[1] - query[1];
-        const double dz = point[2] - query[2], dw = point[3] - query[3];
-        // Retain the double packet reduction order of the previous 4D norm.
-        const double sq_dist = (dx * dx + dz * dz) + (dy * dy + dw * dw);
+        const double sq_dist = ann_detail::squared_distance(point, query);
         result.push(indices[i], sq_dist);
       }
       return !setting.fulfilled(result);

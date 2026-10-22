@@ -5,8 +5,7 @@
 #include <algorithm>
 #include <type_traits>
 #include <vector>
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+#include <small_gicp/util/lie.hpp>
 #include <math/fixed_matrix_ops.h>
 #include <small_gicp/ann/traits.hpp>
 #include <small_gicp/points/traits.hpp>
@@ -45,28 +44,25 @@ public:
   /// @param i               Index of the point
   /// @param T               Transformation matrix
   template <typename PointCloud>
-  void add(const Setting& setting, const Eigen::Vector4d& transformed_pt, const PointCloud& points, size_t i, const Eigen::Isometry3d& T) {
+  void add(const Setting& setting, const NativePoint& transformed_pt, const PointCloud& points, size_t i, const Transform& T) {
     if (this->points.size() >= setting.max_num_points_in_cell) return;
     if (std::any_of(this->points.begin(), this->points.end(), [&](const auto& pt) {
-        return (Eigen::Map<const Eigen::Vector4d>(pt.raw_pointer()) - transformed_pt).squaredNorm() < setting.min_sq_dist_in_cell;
+        return ann_detail::squared_distance(pt, transformed_pt) < setting.min_sq_dist_in_cell;
       })) {
       return;
     }
 
     using earth::mantle::math::operator*;
     using earth::mantle::math::transpose;
-    this->points.push_back(NativePoint::from(transformed_pt.data(), 4));
+    this->points.push_back(transformed_pt);
     if constexpr (HasNormals || HasCovs) {
-      using PackedCovariance = Eigen::Matrix<double, 4, 4, Eigen::RowMajor>;
-      const PackedCovariance packed_transform = T.matrix();
-      const auto transform = NativeCovariance::from(packed_transform.data(), 16);
+      const auto& transform = T;
       if constexpr (HasNormals) {
-        const auto normal = traits::normal(points, i);
-        this->normals.push_back(transform * NativePoint::from(normal.data(), 4));
+        const auto normal = traits::normal_matrix(points, i);
+        this->normals.push_back(transform * normal);
       }
       if constexpr (HasCovs) {
-        const PackedCovariance packed_covariance = traits::cov(points, i);
-        const auto covariance = NativeCovariance::from(packed_covariance.data(), 16);
+        const auto covariance = traits::covariance_matrix(points, i);
         this->covs.push_back(transform * covariance * transpose(transform));
       }
     }
@@ -80,7 +76,8 @@ public:
   /// @param k_index      Index of the nearest neighbor
   /// @param k_sq_dist    Squared distance to the nearest neighbor
   /// @return             Number of found points (0 or 1)
-  size_t nearest_neighbor_search(const Eigen::Vector4d& pt, size_t* k_index, double* k_sq_dist) const {
+  template <typename Query>
+  size_t nearest_neighbor_search(const Query& pt, size_t* k_index, double* k_sq_dist) const {
     if (points.empty()) {
       return 0;
     }
@@ -96,7 +93,8 @@ public:
   /// @param k_indices    Indices of nearest neighbors
   /// @param k_sq_dists   Squared distances to nearest neighbors (sorted in ascending order)
   /// @return             Number of found points
-  size_t knn_search(const Eigen::Vector4d& pt, int k, size_t* k_indices, double* k_sq_dists) const {
+  template <typename Query>
+  size_t knn_search(const Query& pt, int k, size_t* k_indices, double* k_sq_dists) const {
     if (points.empty()) {
       return 0;
     }
@@ -109,14 +107,14 @@ public:
   /// @brief Find k nearest neighbors and push them into the given result.
   /// @param pt           Query point
   /// @param result       Result collector that receives the candidates
-  template <typename Result>
-  void knn_search(const Eigen::Vector4d& pt, Result& result) const {
+  template <typename Query, typename Result>
+  void knn_search(const Query& pt, Result& result) const {
     if (points.empty()) {
       return;
     }
 
     for (size_t i = 0; i < points.size(); i++) {
-      const double sq_dist = (Eigen::Map<const Eigen::Vector4d>(points[i].raw_pointer()) - pt).squaredNorm();
+      const double sq_dist = ann_detail::squared_distance(points[i], pt);
       result.push(i, sq_dist);
     }
   }
@@ -147,27 +145,22 @@ struct Traits<FlatContainer<HasNormals, HasCovs>> {
   static bool has_normals(const FlatContainer<HasNormals, HasCovs>& container) { return HasNormals && container.size(); }
   static bool has_covs(const FlatContainer<HasNormals, HasCovs>& container) { return HasCovs && container.size(); }
 
-  static Eigen::Vector4d point(const FlatContainer<HasNormals, HasCovs>& container, size_t i) {
-    return Eigen::Map<const Eigen::Vector4d>(container.points[i].raw_pointer());
-  }
-  static Eigen::Vector4d normal(const FlatContainer<HasNormals, HasCovs>& container, size_t i) {
-    return Eigen::Map<const Eigen::Vector4d>(container.normals[i].raw_pointer());
-  }
-  static Eigen::Matrix4d cov(const FlatContainer<HasNormals, HasCovs>& container, size_t i) {
-    using PackedCovariance = Eigen::Matrix<double, 4, 4, Eigen::RowMajor>;
-    return Eigen::Map<const PackedCovariance>(container.covs[i].raw_pointer());
-  }
+  static auto point(const FlatContainer<HasNormals, HasCovs>& container, size_t i) { return container.points[i]; }
+  static auto normal(const FlatContainer<HasNormals, HasCovs>& container, size_t i) { return container.normals[i]; }
+  static auto cov(const FlatContainer<HasNormals, HasCovs>& container, size_t i) { return container.covs[i]; }
 
-  static size_t nearest_neighbor_search(const FlatContainer<HasNormals, HasCovs>& container, const Eigen::Vector4d& pt, size_t* k_index, double* k_sq_dist) {
+  template <typename Query>
+  static size_t nearest_neighbor_search(const FlatContainer<HasNormals, HasCovs>& container, const Query& pt, size_t* k_index, double* k_sq_dist) {
     return container.nearest_neighbor_search(pt, k_index, k_sq_dist);
   }
 
-  static size_t knn_search(const FlatContainer<HasNormals, HasCovs>& container, const Eigen::Vector4d& pt, size_t k, size_t* k_index, double* k_sq_dist) {
+  template <typename Query>
+  static size_t knn_search(const FlatContainer<HasNormals, HasCovs>& container, const Query& pt, size_t k, size_t* k_index, double* k_sq_dist) {
     return container.knn_search(pt, k, k_index, k_sq_dist);
   }
 
-  template <typename Result>
-  static void knn_search(const FlatContainer<HasNormals, HasCovs>& container, const Eigen::Vector4d& pt, Result& result) {
+  template <typename Query, typename Result>
+  static void knn_search(const FlatContainer<HasNormals, HasCovs>& container, const Query& pt, Result& result) {
     container.knn_search(pt, result);
   }
 };

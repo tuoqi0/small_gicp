@@ -1,10 +1,28 @@
+#include <small_gicp/util/eigen.hpp>
 #include <robot_core/test/doctest.h>
 #include <small_gicp/points/point_cloud.hpp>
 #include <small_gicp/ann/kdtree.hpp>
+#include <small_gicp/ann/projective_search.hpp>
 #include <Eigen/Eigenvalues>
 #include <algorithm>
 #include <numeric>
 #include <random>
+
+TEST_CASE("native spherical projection retains the original normalized bearing") {
+  std::mt19937 generator(851);
+  std::normal_distribution<double> random(0, 1);
+  const small_gicp::EquirectangularProjection projection;
+  for (int i = 0; i < 1000; ++i) {
+    const Eigen::Vector3d point(random(generator), random(generator), random(generator));
+    const Eigen::Vector3d bearing = point.normalized();
+    const auto actual = projection(point);
+    CHECK(actual[0] == doctest::Approx(std::atan2(bearing[0], bearing[2]) / (2 * M_PI) + .5).epsilon(1e-14));
+    CHECK(actual[1] == doctest::Approx(-std::asin(bearing[1]) / M_PI + .5).epsilon(1e-14));
+  }
+  const auto center = projection(std::array<double, 3>{{0, 0, 0}});
+  CHECK(center[0] == .5);
+  CHECK(center[1] == .5);
+}
 
 TEST_CASE("projection preserves Eigen sampling and homogeneous-coordinate normalization") {
   std::mt19937 generator(614);
@@ -16,7 +34,7 @@ TEST_CASE("projection preserves Eigen sampling and homogeneous-coordinate normal
         points.emplace_back(4 + random(generator), -2 + 2 * random(generator), 3 * random(generator));
       small_gicp::PointCloud cloud(points);
       // Preserve sum(w), rather than silently replacing it with sample count.
-      for (size_t i = 0; i < cloud.size(); ++i) cloud.point(i).w() = 1 + 0.01 * (i % 3);
+      for (size_t i = 0; i < cloud.size(); ++i) small_gicp::eigen_view(cloud.point(i)).w() = 1 + 0.01 * (i % 3);
       std::vector<size_t> indices(cloud.size());
       std::iota(indices.begin(), indices.end(), 0);
       std::shuffle(indices.begin(), indices.end(), generator);
@@ -25,7 +43,7 @@ TEST_CASE("projection preserves Eigen sampling and homogeneous-coordinate normal
       Eigen::Vector4d squares = Eigen::Vector4d::Zero();
       Eigen::Matrix4d cross = Eigen::Matrix4d::Zero();
       for (size_t i = 0; i < cloud.size() / step; ++i) {
-        const auto& point = cloud.point(indices[step * i]);
+        const auto& point = small_gicp::eigen_view(cloud.point(indices[step * i]));
         sum += point;
         squares += point.cwiseProduct(point);
         cross += point * point.transpose();

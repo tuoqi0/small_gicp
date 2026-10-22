@@ -4,6 +4,11 @@
 
 #include <atomic>
 #include <memory>
+#include <cstdint>
+#include <limits>
+#include <algorithm>
+#include <numeric>
+#include <math/fixed_matrix_ops.h>
 #include <iostream>
 
 #include <small_gicp/points/traits.hpp>
@@ -24,6 +29,8 @@ namespace small_gicp {
 /// @return           Downsampled points
 template <typename InputPointCloud, typename OutputPointCloud = InputPointCloud>
 std::shared_ptr<OutputPointCloud> voxelgrid_sampling_omp(const InputPointCloud& points, double leaf_size, int num_threads = 4) {
+  using earth::mantle::math::operator*;
+  using earth::mantle::math::operator+;
   if (traits::size(points) == 0) {
     return std::make_shared<OutputPointCloud>();
   }
@@ -38,8 +45,9 @@ std::shared_ptr<OutputPointCloud> voxelgrid_sampling_omp(const InputPointCloud& 
   std::vector<std::pair<std::uint64_t, size_t>> coord_pt(traits::size(points));
 #pragma omp parallel for num_threads(num_threads) schedule(guided, 32)
   for (std::int64_t i = 0; i < traits::size(points); i++) {
-    const Eigen::Array4i coord = fast_floor(traits::point(points, i) * inv_leaf_size) + coord_offset;
-    if ((coord < 0).any() || (coord > coord_bit_mask).any()) {
+    auto coord = fast_floor(traits::point_matrix(points, i) * inv_leaf_size);
+    for (int& value : coord) value += coord_offset;
+    if (std::any_of(coord.begin(), coord.end(), [=](int value) { return value < 0 || value > static_cast<int>(coord_bit_mask); })) {
       std::cerr << "warning: voxel coord is out of range!!" << std::endl;
       coord_pt[i] = {invalid_coord, i};
       continue;
@@ -64,24 +72,24 @@ std::shared_ptr<OutputPointCloud> voxelgrid_sampling_omp(const InputPointCloud& 
 
 #pragma omp parallel for num_threads(num_threads) schedule(guided, 4)
   for (std::int64_t block_begin = 0; block_begin < traits::size(points); block_begin += block_size) {
-    std::vector<Eigen::Vector4d> sub_points;
+    std::vector<earth::mantle::collection::Matrix<double, 4, 1>> sub_points;
     sub_points.reserve(block_size);
 
     const size_t block_end = std::min<size_t>(traits::size(points), block_begin + block_size);
 
-    Eigen::Vector4d sum_pt = traits::point(points, coord_pt[block_begin].second);
+    earth::mantle::collection::Matrix<double, 4, 1> sum_pt = traits::point_matrix(points, coord_pt[block_begin].second);
     for (size_t i = block_begin + 1; i != block_end; i++) {
       if (coord_pt[i].first == invalid_coord) {
         continue;
       }
 
       if (coord_pt[i - 1].first != coord_pt[i].first) {
-        sub_points.emplace_back(sum_pt / sum_pt.w());
-        sum_pt.setZero();
+        sub_points.emplace_back(traits::normalized_point(sum_pt));
+        sum_pt = {};
       }
-      sum_pt += traits::point(points, coord_pt[i].second);
+      sum_pt = sum_pt + traits::point_matrix(points, coord_pt[i].second);
     }
-    sub_points.emplace_back(sum_pt / sum_pt.w());
+    sub_points.emplace_back(traits::normalized_point(sum_pt));
 
     const size_t point_index_begin = num_points.fetch_add(sub_points.size());
     for (size_t i = 0; i < sub_points.size(); i++) {

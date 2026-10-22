@@ -24,7 +24,7 @@ public:
   /// @param pt  Point to project
   /// @return    Projected value
   template <typename Point>
-  double operator()(const Point& pt) const { return pt[axis]; }
+  double operator()(const Point& pt) const { return traits::detail::coordinate(pt, axis); }
 
   /// @brief Find the axis with the largest variance.
   /// @param points     Point cloud
@@ -45,10 +45,10 @@ public:
       const auto itr = first + step * i;
       const auto pt = traits::point(points, *itr);
       for (size_t axis = 0; axis < 3; ++axis) {
-        sum_pt[axis][0] += pt[axis];
-        sum_sq[axis][0] += pt[axis] * pt[axis];
+        sum_pt[axis][0] += traits::detail::coordinate(pt, axis);
+        sum_sq[axis][0] += traits::detail::coordinate(pt, axis) * traits::detail::coordinate(pt, axis);
       }
-      sum_pt[3][0] += pt[3];
+      sum_pt[3][0] += traits::detail::coordinate(pt, 3);
     }
 
     std::array<double, 3> var{};
@@ -71,7 +71,7 @@ public:
   /// @return     Projected value
   template <typename Point>
   double operator()(const Point& pt) const {
-    return normal[0] * pt[0] + normal[1] * pt[1] + normal[2] * pt[2];
+    return normal[0] * traits::detail::coordinate(pt, 0) + normal[1] * traits::detail::coordinate(pt, 1) + normal[2] * traits::detail::coordinate(pt, 2);
   }
 
   /// @brief  Find the direction with the largest variance.
@@ -94,11 +94,11 @@ public:
       const auto itr = first + step * i;
       const auto pt = traits::point(points, *itr);
       for (size_t row = 0; row < 3; ++row) {
-        sum_pt[row][0] += pt[row];
+        sum_pt[row][0] += traits::detail::coordinate(pt, row);
         for (size_t col = 0; col < 3; ++col)
-          sum_sq[row][col] += pt[row] * pt[col];
+          sum_sq[row][col] += traits::detail::coordinate(pt, row) * traits::detail::coordinate(pt, col);
       }
-      sum_pt[3][0] += pt[3];
+      sum_pt[3][0] += traits::detail::coordinate(pt, 3);
     }
 
     std::array<double, 9> covariance{};
