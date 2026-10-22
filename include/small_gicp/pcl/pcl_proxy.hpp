@@ -3,6 +3,7 @@
 #pragma once
 
 #include <pcl/point_cloud.h>
+#include <collection/fixed_matrix.h>
 #include <small_gicp/points/traits.hpp>
 
 namespace small_gicp {
@@ -31,6 +32,10 @@ struct Traits<PointCloudProxy<PointT>> {
 
   static void resize(Points& points, size_t n) { points.covs.resize(n); }
   static void set_cov(Points& points, size_t i, const Eigen::Matrix4d& cov) { points.covs[i] = cov; }
+  static void set_cov(Points& points, size_t i, const earth::mantle::collection::Matrix<double, 4, 4>& cov) {
+    using RowMajorCovariance = Eigen::Matrix<double, 4, 4, Eigen::RowMajor>;
+    points.covs[i] = Eigen::Map<const RowMajorCovariance>(cov.raw_pointer());
+  }
 };
 
 }  // namespace traits

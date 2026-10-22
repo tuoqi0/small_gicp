@@ -4,6 +4,7 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <math/fixed_matrix_ops.h>
 
 #include <small_gicp/ann/traits.hpp>
 #include <small_gicp/points/traits.hpp>
@@ -17,7 +18,7 @@ public:
   struct Setting {};
 
   /// @brief Constructor.
-  GaussianVoxel() : finalized(false), num_points(0), mean(Eigen::Vector4d::Zero()), cov(Eigen::Matrix4d::Zero()) {}
+  GaussianVoxel() : finalized(false), num_points(0), mean{}, cov{} {}
 
   /// @brief  Number of points in the voxel (Always 1 for GaussianVoxel).
   size_t size() const { return 1; }
@@ -30,15 +31,23 @@ public:
   /// @param  T              Transformation matrix
   template <typename PointCloud>
   void add(const Setting& setting, const Eigen::Vector4d& transformed_pt, const PointCloud& points, size_t i, const Eigen::Isometry3d& T) {
+    using earth::mantle::math::operator*;
+    using earth::mantle::math::operator+;
+    using earth::mantle::math::transpose;
+    using PackedCovariance = Eigen::Matrix<double, 4, 4, Eigen::RowMajor>;
+    const PackedCovariance packed_transform = T.matrix();
+    const PackedCovariance packed_covariance = traits::cov(points, i);
+    const auto transform = NativeCovariance::from(packed_transform.data(), 16);
+    const auto covariance = NativeCovariance::from(packed_covariance.data(), 16);
     if (finalized) {
       this->finalized = false;
-      this->mean *= num_points;
-      this->cov *= num_points;
+      this->mean = static_cast<double>(num_points) * this->mean;
+      this->cov = static_cast<double>(num_points) * this->cov;
     }
 
     num_points++;
-    this->mean += transformed_pt;
-    this->cov += T.matrix() * traits::cov(points, i) * T.matrix().transpose();
+    this->mean = this->mean + NativePoint::from(transformed_pt.data(), 4);
+    this->cov = this->cov + transform * covariance * transpose(transform);
   }
 
   /// @brief Finalize the voxel mean and covariance.
@@ -47,16 +56,23 @@ public:
       return;
     }
 
-    mean /= num_points;
-    cov /= num_points;
+    // Preserve direct division (not reciprocal multiplication) and the original
+    // sum/average lifecycle when more points arrive after finalization.
+    const double count = static_cast<double>(num_points);
+    for (size_t row = 0; row < 4; ++row) {
+      mean[row][0] /= count;
+      for (size_t col = 0; col < 4; ++col) cov[row][col] /= count;
+    }
     finalized = true;
   }
 
 public:
   bool finalized;        ///< If true, mean and cov are finalized, otherwise they represent the sum of input points
   size_t num_points;     ///< Number of input points
-  Eigen::Vector4d mean;  ///< Mean
-  Eigen::Matrix4d cov;   ///< Covariance
+  using NativePoint = earth::mantle::collection::Matrix<double, 4, 1>;
+  using NativeCovariance = earth::mantle::collection::Matrix<double, 4, 4>;
+  NativePoint mean;      ///< Mean (homogeneous coordinate included)
+  NativeCovariance cov;  ///< Row-major covariance
 };
 
 namespace traits {
@@ -67,12 +83,17 @@ struct Traits<GaussianVoxel> {
   static bool has_points(const GaussianVoxel& voxel) { return true; }
   static bool has_covs(const GaussianVoxel& voxel) { return true; }
 
-  static const Eigen::Vector4d& point(const GaussianVoxel& voxel, size_t i) { return voxel.mean; }
-  static const Eigen::Matrix4d& cov(const GaussianVoxel& voxel, size_t i) { return voxel.cov; }
+  static Eigen::Vector4d point(const GaussianVoxel& voxel, size_t i) {
+    return Eigen::Map<const Eigen::Vector4d>(voxel.mean.raw_pointer());
+  }
+  static Eigen::Matrix4d cov(const GaussianVoxel& voxel, size_t i) {
+    using PackedCovariance = Eigen::Matrix<double, 4, 4, Eigen::RowMajor>;
+    return Eigen::Map<const PackedCovariance>(voxel.cov.raw_pointer());
+  }
 
   static size_t nearest_neighbor_search(const GaussianVoxel& voxel, const Eigen::Vector4d& pt, size_t* k_index, double* k_sq_dist) {
     *k_index = 0;
-    *k_sq_dist = (voxel.mean - pt).squaredNorm();
+    *k_sq_dist = (point(voxel, 0) - pt).squaredNorm();
     return 1;
   }
 
@@ -82,7 +103,7 @@ struct Traits<GaussianVoxel> {
 
   template <typename Result>
   static void knn_search(const GaussianVoxel& voxel, const Eigen::Vector4d& pt, Result& result) {
-    result.push(0, (voxel.mean - pt).squaredNorm());
+    result.push(0, (point(voxel, 0) - pt).squaredNorm());
   }
 };
 

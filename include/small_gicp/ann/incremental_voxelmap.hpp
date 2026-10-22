@@ -4,6 +4,9 @@
 
 #include <vector>
 #include <unordered_map>
+#include <algorithm>
+#include <memory>
+#include <utility>
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>

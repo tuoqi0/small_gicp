@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <Eigen/Core>
+#include <cstddef>
 
 namespace small_gicp {
 
@@ -60,20 +60,20 @@ void resize(T& points, size_t n) {
 }
 
 /// @brief Set i-th point. (x, y, z, 1)
-template <typename T>
-void set_point(T& points, size_t i, const Eigen::Vector4d& pt) {
+template <typename T, typename Point>
+void set_point(T& points, size_t i, const Point& pt) {
   Traits<T>::set_point(points, i, pt);
 }
 
 /// @brief Set i-th normal. (nx, nz, nz, 0)
-template <typename T>
-void set_normal(T& points, size_t i, const Eigen::Vector4d& pt) {
+template <typename T, typename Normal>
+void set_normal(T& points, size_t i, const Normal& pt) {
   Traits<T>::set_normal(points, i, pt);
 }
 
 /// @brief Set i-th covariance. Only the top-left 3x3 matrix should be filled.
-template <typename T>
-void set_cov(T& points, size_t i, const Eigen::Matrix4d& cov) {
+template <typename T, typename Covariance>
+void set_cov(T& points, size_t i, const Covariance& cov) {
   Traits<T>::set_cov(points, i, cov);
 }
 

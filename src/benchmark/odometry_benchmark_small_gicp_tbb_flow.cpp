@@ -1,4 +1,5 @@
 #ifdef BUILD_WITH_TBB
+#include <vector>
 
 #include <small_gicp/benchmark/benchmark_odom.hpp>
 
@@ -126,8 +127,13 @@ public:
 
         auto async_viewer = guik::async_viewer();
         async_viewer->invoke([=] { guik::viewer()->shader_setting().add("z_range", z_range); });
-        async_viewer->update_points(guik::anon(), input->points->points, guik::Rainbow(T));
-        async_viewer->update_points("points", input->points->points, guik::FlatOrange(T).set_point_scale(2.0f));
+        std::vector<Eigen::Vector4d> display_points;
+        display_points.reserve(input->points->size());
+        for (size_t i = 0; i < input->points->size(); ++i) {
+          display_points.push_back(input->points->point(i));
+        }
+        async_viewer->update_points(guik::anon(), display_points, guik::Rainbow(T));
+        async_viewer->update_points("points", display_points, guik::FlatOrange(T).set_point_scale(2.0f));
       }
 #endif
     });

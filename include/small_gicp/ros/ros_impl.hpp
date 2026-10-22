@@ -74,7 +74,7 @@ PointCloud::Ptr from_impl(const PointCloud2T& msg) {
       continue;
     }
 
-    cloud->points.emplace_back(x, y, z, 1.0);
+    cloud->points.push_back(PointCloud::NativePoint::from({x, y, z, 1.0}));
   }
 
   // Resize normals and covs to match points size

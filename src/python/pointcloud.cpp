@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 #include <iostream>
+#include <vector>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -74,7 +75,13 @@ void define_pointcloud(py::module& m) {
         )pbdoc")
     .def(
       "points",
-      [](const PointCloud& points) -> Eigen::MatrixXd { return Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(points.points[0].data(), points.size(), 4); },
+      [](const PointCloud& points) -> Eigen::MatrixXd {
+        Eigen::MatrixXd output(static_cast<Eigen::Index>(points.size()), 4);
+        for (size_t i = 0; i < points.size(); ++i) {
+          output.row(static_cast<Eigen::Index>(i)) = points.point(i).transpose();
+        }
+        return output;
+      },
       R"pbdoc(
         Get the points as a Nx4 matrix.
 
@@ -85,7 +92,13 @@ void define_pointcloud(py::module& m) {
         )pbdoc")
     .def(
       "normals",
-      [](const PointCloud& points) -> Eigen::MatrixXd { return Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(points.normals[0].data(), points.size(), 4); },
+      [](const PointCloud& points) -> Eigen::MatrixXd {
+        Eigen::MatrixXd output(static_cast<Eigen::Index>(points.size()), 4);
+        for (size_t i = 0; i < points.size(); ++i) {
+          output.row(static_cast<Eigen::Index>(i)) = points.normal(i).transpose();
+        }
+        return output;
+      },
       R"pbdoc(
         Get the normals as a Nx4 matrix.
 
@@ -96,7 +109,14 @@ void define_pointcloud(py::module& m) {
         )pbdoc")
     .def(
       "covs",
-      [](const PointCloud& points) { return points.covs; },
+      [](const PointCloud& points) {
+        std::vector<Eigen::Matrix4d> output;
+        output.reserve(points.size());
+        for (size_t i = 0; i < points.size(); ++i) {
+          output.push_back(points.cov(i));
+        }
+        return output;
+      },
       R"pbdoc(
         Get the covariance matrices as a list of 4x4 matrices.
 

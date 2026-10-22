@@ -19,7 +19,6 @@ inline Eigen::Matrix3d skew(const Eigen::Vector3d& x) {
   skew(1, 2) = -x[0];
   skew(2, 0) = -x[1];
   skew(2, 1) = x[0];
-
   return skew;
 }
 
@@ -53,7 +52,8 @@ inline Eigen::Matrix3d skew(const Eigen::Vector3d& x) {
 /// @param omega  [rx, ry, rz]
 /// @return       Quaternion
 inline Eigen::Quaterniond so3_exp(const Eigen::Vector3d& omega) {
-  const auto q = earth::mantle::math::so3Exp({{omega.x(), omega.y(), omega.z()}});
+  const auto q = earth::mantle::math::so3Exp({{omega[0], omega[1], omega[2]}});
+  // Mantle stores x/y/z/w; Eigen's constructor takes w/x/y/z.
   return Eigen::Quaterniond(q[3], q[0], q[1], q[2]);
 }
 
@@ -62,13 +62,11 @@ inline Eigen::Quaterniond so3_exp(const Eigen::Vector3d& omega) {
 /// @param a  Twist vector [rx, ry, rz, tx, ty, tz]
 /// @return   SE3 matrix
 inline Eigen::Isometry3d se3_exp(const Eigen::Matrix<double, 6, 1>& a) {
-  const auto pose = earth::mantle::math::se3Exp({{a[0], a[1], a[2], a[3], a[4], a[5]}});
+  const auto native = earth::mantle::math::se3Exp({{a[0], a[1], a[2], a[3], a[4], a[5]}});
   Eigen::Isometry3d result = Eigen::Isometry3d::Identity();
-  for (int row = 0; row < 3; ++row) {
-    result.translation()[row] = pose.translation[static_cast<std::size_t>(row)];
-    for (int col = 0; col < 3; ++col)
-      result.linear()(row, col) = pose.rotation[static_cast<std::size_t>(row * 3 + col)];
-  }
+  result.linear() = Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(
+      native.rotation.data());
+  result.translation() = Eigen::Map<const Eigen::Vector3d>(native.translation.data());
   return result;
 }
 
