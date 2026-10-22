@@ -42,20 +42,9 @@ endif()
 # Math kernels are shared by interface; slam_math remains standalone.
 find_package(slam_math CONFIG REQUIRED)
 
-# Eigen remains required for point storage and the unconverted registration code
-find_package(Eigen3 CONFIG)
-
-if(NOT Eigen3_FOUND)
-  message(STATUS "System Eigen not found. Download Eigen 3.4.0.")
-  include(FetchContent)
-  FetchContent_Populate(
-    Eigen3
-    URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
-  )
-  add_library(Eigen3::Eigen INTERFACE IMPORTED GLOBAL)
-  set_target_properties(Eigen3::Eigen PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES "${eigen3_SOURCE_DIR}"
-  )
+# Only the optional external adapters and reference programs use Eigen.
+if(BUILD_PYTHON_BINDINGS OR BUILD_TESTS OR BUILD_EXAMPLES OR BUILD_BENCHMARKS)
+  find_package(Eigen3 CONFIG REQUIRED)
 endif()
 
 if(BUILD_WITH_OPENMP STREQUAL "auto")
@@ -140,7 +129,6 @@ if(BUILD_HELPER)
     $<INSTALL_INTERFACE:include>
   )
   target_link_libraries(small_gicp PUBLIC
-    Eigen3::Eigen
     slam_math::slam_math
     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
@@ -253,6 +241,7 @@ if(BUILD_EXAMPLES)
     add_executable(${EXAMPLE_NAME} ${EXAMPLE_SOURCE})
     target_link_libraries(${EXAMPLE_NAME} PRIVATE
       small_gicp
+      Eigen3::Eigen
       fmt::fmt
       TBB::tbb
       TBB::tbbmalloc
@@ -282,6 +271,7 @@ if(BUILD_TESTS)
     robot_core_add_test(${TEST_NAME} ${TEST_SOURCE})
     target_link_libraries(${TEST_NAME}
       small_gicp
+      Eigen3::Eigen
       fmt::fmt
       TBB::tbb
       TBB::tbbmalloc

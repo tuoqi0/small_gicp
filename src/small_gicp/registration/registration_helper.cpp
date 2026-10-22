@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 #include <small_gicp/registration/registration_helper.hpp>
-#include <small_gicp/util/eigen.hpp>
 
 #include <small_gicp/ann/kdtree.hpp>
 #include <small_gicp/ann/kdtree_omp.hpp>
@@ -34,19 +33,6 @@ std::pair<PointCloud::Ptr, std::shared_ptr<KdTree<PointCloud>>> preprocess_point
   }
 }
 
-// Preprocess points with Eigen input
-template <typename T, int D>
-std::pair<PointCloud::Ptr, std::shared_ptr<KdTree<PointCloud>>>
-preprocess_points(const std::vector<Eigen::Matrix<T, D, 1>>& points, double downsampling_resolution, int num_neighbors, int num_threads) {
-  return preprocess_points(*std::make_shared<PointCloud>(points), downsampling_resolution, num_neighbors, num_threads);
-}
-
-// Explicit instantiation
-template std::pair<PointCloud::Ptr, std::shared_ptr<KdTree<PointCloud>>> preprocess_points(const std::vector<Eigen::Matrix<float, 3, 1>>&, double, int, int);
-template std::pair<PointCloud::Ptr, std::shared_ptr<KdTree<PointCloud>>> preprocess_points(const std::vector<Eigen::Matrix<float, 4, 1>>&, double, int, int);
-template std::pair<PointCloud::Ptr, std::shared_ptr<KdTree<PointCloud>>> preprocess_points(const std::vector<Eigen::Matrix<double, 3, 1>>&, double, int, int);
-template std::pair<PointCloud::Ptr, std::shared_ptr<KdTree<PointCloud>>> preprocess_points(const std::vector<Eigen::Matrix<double, 4, 1>>&, double, int, int);
-
 // Create Gaussian voxel map
 GaussianVoxelMap::Ptr create_gaussian_voxelmap(const PointCloud& points, double voxel_resolution) {
   auto voxelmap = std::make_shared<GaussianVoxelMap>(voxel_resolution);
@@ -54,33 +40,9 @@ GaussianVoxelMap::Ptr create_gaussian_voxelmap(const PointCloud& points, double 
   return voxelmap;
 }
 
-// Align point clouds with Eigen input
-template <typename T, int D>
-RegistrationResult
-align(const std::vector<Eigen::Matrix<T, D, 1>>& target, const std::vector<Eigen::Matrix<T, D, 1>>& source, const Eigen::Isometry3d& init_T, const RegistrationSetting& setting) {
-  auto [target_points, target_tree] = preprocess_points(*std::make_shared<PointCloud>(target), setting.downsampling_resolution, 10, setting.num_threads);
-  auto [source_points, source_tree] = preprocess_points(*std::make_shared<PointCloud>(source), setting.downsampling_resolution, 10, setting.num_threads);
-
-  if (setting.type == RegistrationSetting::VGICP) {
-    auto target_voxelmap = create_gaussian_voxelmap(*target_points, setting.voxel_resolution);
-    return align(*target_voxelmap, *source_points, init_T, setting);
-  } else {
-    return align(*target_points, *source_points, *target_tree, init_T, setting);
-  }
-}
-
-template RegistrationResult
-align(const std::vector<Eigen::Matrix<float, 3, 1>>&, const std::vector<Eigen::Matrix<float, 3, 1>>&, const Eigen::Isometry3d&, const RegistrationSetting&);
-template RegistrationResult
-align(const std::vector<Eigen::Matrix<float, 4, 1>>&, const std::vector<Eigen::Matrix<float, 4, 1>>&, const Eigen::Isometry3d&, const RegistrationSetting&);
-template RegistrationResult
-align(const std::vector<Eigen::Matrix<double, 3, 1>>&, const std::vector<Eigen::Matrix<double, 3, 1>>&, const Eigen::Isometry3d&, const RegistrationSetting&);
-template RegistrationResult
-align(const std::vector<Eigen::Matrix<double, 4, 1>>&, const std::vector<Eigen::Matrix<double, 4, 1>>&, const Eigen::Isometry3d&, const RegistrationSetting&);
-
 // Align point clouds
 RegistrationResult
-align(const PointCloud& target, const PointCloud& source, const KdTree<PointCloud>& target_tree, const Eigen::Isometry3d& init_T, const RegistrationSetting& setting) {
+align(const PointCloud& target, const PointCloud& source, const KdTree<PointCloud>& target_tree, const Transform& init_T, const RegistrationSetting& setting) {
   switch (setting.type) {
     default:
       std::cerr << "invalid registration type" << std::endl;
@@ -93,7 +55,7 @@ align(const PointCloud& target, const PointCloud& source, const KdTree<PointClou
       registration.criteria.translation_eps = setting.translation_eps;
       registration.optimizer.max_iterations = setting.max_iterations;
       registration.optimizer.verbose = setting.verbose;
-      return registration.align(target, source, target_tree, native_transform(init_T));
+      return registration.align(target, source, target_tree, init_T);
     }
     case RegistrationSetting::PLANE_ICP: {
       Registration<PointToPlaneICPFactor, ParallelReductionOMP> registration;
@@ -103,7 +65,7 @@ align(const PointCloud& target, const PointCloud& source, const KdTree<PointClou
       registration.criteria.translation_eps = setting.translation_eps;
       registration.optimizer.max_iterations = setting.max_iterations;
       registration.optimizer.verbose = setting.verbose;
-      return registration.align(target, source, target_tree, native_transform(init_T));
+      return registration.align(target, source, target_tree, init_T);
     }
     case RegistrationSetting::GICP: {
       Registration<GICPFactor, ParallelReductionOMP> registration;
@@ -113,17 +75,17 @@ align(const PointCloud& target, const PointCloud& source, const KdTree<PointClou
       registration.criteria.translation_eps = setting.translation_eps;
       registration.optimizer.max_iterations = setting.max_iterations;
       registration.optimizer.verbose = setting.verbose;
-      return registration.align(target, source, target_tree, native_transform(init_T));
+      return registration.align(target, source, target_tree, init_T);
     }
     case RegistrationSetting::VGICP: {
-      std::cerr << "error: use align(const GaussianVoxelMap&, const GaussianVoxelMap&, const Eigen::Isometry3d&, const RegistrationSetting&) for VGICP" << std::endl;
+      std::cerr << "error: use align(const GaussianVoxelMap&, const GaussianVoxelMap&, const Transform&, const RegistrationSetting&) for VGICP" << std::endl;
       return RegistrationResult{};
     }
   }
 }
 
 // Align point clouds with VGICP
-RegistrationResult align(const GaussianVoxelMap& target, const PointCloud& source, const Eigen::Isometry3d& init_T, const RegistrationSetting& setting) {
+RegistrationResult align(const GaussianVoxelMap& target, const PointCloud& source, const Transform& init_T, const RegistrationSetting& setting) {
   if (setting.type != RegistrationSetting::VGICP) {
     std::cerr << "invalid registration type for GaussianVoxelMap" << std::endl;
   }
@@ -134,7 +96,7 @@ RegistrationResult align(const GaussianVoxelMap& target, const PointCloud& sourc
   registration.criteria.translation_eps = setting.translation_eps;
   registration.optimizer.max_iterations = setting.max_iterations;
   registration.optimizer.verbose = setting.verbose;
-  return registration.align(target, source, target, native_transform(init_T));
+  return registration.align(target, source, target, init_T);
 }
 
 }  // namespace small_gicp

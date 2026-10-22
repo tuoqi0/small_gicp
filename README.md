@@ -4,7 +4,7 @@
 
 - **Highly Optimized** : The core registration algorithm implementation has been further optimized from fast_gicp, achieving up to **2x speed gain**.
 - **Fully parallerized** : small_gicp offers parallel implementations of several preprocessing algorithms, making the entire registration process parallelized (e.g., Downsampling, KdTree construction, Normal/Covariance estimation). It supports [OpenMP](https://www.openmp.org/) and [Intel TBB](https://github.com/oneapi-src/oneTBB) as parallelism backends.
-- **Minimum dependencies** : The library requires only [Eigen](https://eigen.tuxfamily.org/) along with the bundled [nanoflann](https://github.com/jlblancoc/nanoflann) and [Sophus](https://github.com/strasdat/Sophus). Optionally, it supports a [PCL](https://pointclouds.org/) registration interface for use as a drop-in replacement
+- **Native math backend** : This fork uses `slam_math` and `robot_core` for point storage, preprocessing and registration. Eigen and PCL are optional external interfaces, not dependencies of the default helper library.
 - **Customizable** : small_gicp allows the integration of any custom point cloud class into the registration algorithm via traits. Its template-based implementation enables customization of the registration process with original correspondence estimators and registration factors.
 - **Python bindings** : By being isolated from PCL, small_gicp's Python bindings are more portable and can be used seamlessly with other libraries such as Open3D.
 
@@ -21,19 +21,19 @@ This library uses C++17 features. The PCL interface is not compatible with PCL o
 
 ## Dependencies
 
-- [Mandatory] [Eigen](https://eigen.tuxfamily.org/), [nanoflann](https://github.com/jlblancoc/nanoflann) ([bundled](include/small_gicp/ann/kdtree.hpp)), [Sophus](https://github.com/strasdat/Sophus) ([bundled](include/small_gicp/util/lie.hpp))
-- [Optional] [OpenMP](https://www.openmp.org/), [Intel TBB](https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html), [PCL](https://pointclouds.org/)
+- [Mandatory] Installed `slam_math` / `robot_core` math packages. The nearest-neighbor implementation is bundled.
+- [Optional] OpenMP, TBB, Eigen and PCL. Python bindings, examples, benchmarks and reference tests use Eigen; PCL is only needed by its adapters and reference programs. Optional dependencies are not fetched automatically.
 
 ## Installation
 
 ### C++
 
-small_gicp is a header-only library. You can just download and drop it in your project directory to use it.
+The registration templates use the installed native math headers/library. Set `CMAKE_PREFIX_PATH` to the install prefix containing `slam_math` and `robot_core` before configuring this fork.
 
 If you need only basic point cloud registration functions, you can build and install the helper library as follows.
 
 ```bash
-sudo apt-get install libeigen3-dev libomp-dev
+sudo apt-get install libomp-dev
 
 cd small_gicp
 mkdir build && cd build
@@ -48,6 +48,8 @@ sudo make install
 ```bash
 pip install small_gicp
 ```
+
+The PyPI package is upstream small_gicp, not this native-math fork. Build this fork from source with its installed math dependencies when validating the migration.
 
 #### Install from source
 
@@ -73,23 +75,23 @@ The following examples assume `using namespace small_gicp` is placed somewhere.
 
 ### Using helper library ([01_basic_registration.cpp](src/example/01_basic_registration.cpp))
 
-The helper library (`registration_helper.hpp`) enables easily processing point clouds represented as `std::vector<Eigen::Vector(3|4)(f|d)>`.
+The helper library (`registration_helper.hpp`) accepts standard coordinate arrays or native point vectors. An externally included Eigen vector can also be read through the generic coordinate accessor; the helper itself does not include Eigen.
 <details><summary>Expand</summary>
 
-`small_gicp::align` takes two point clouds (`std::vectors` of `Eigen::Vector(3|4)(f|d)`) and returns a registration result (estimated transformation and some information on the optimization result). This is the easiest way to use small_gicp but causes an overhead for duplicated preprocessing.
+`small_gicp::align` takes two raw point vectors and returns a registration result. This convenience call preprocesses both clouds each time. Its initial and returned transforms are native 4x4 matrices; existing Eigen callers must convert explicitly with `native_transform()` / `eigen_transform()` from `small_gicp/util/eigen.hpp` and link their own Eigen dependency.
 
 ```cpp
 #include <small_gicp/registration/registration_helper.hpp>
 
-std::vector<Eigen::Vector3d> target_points = ...;   // Any of Eigen::Vector(3|4)(f|d) can be used
-std::vector<Eigen::Vector3d> source_points = ...;   // 
+std::vector<std::array<double, 3>> target_points = ...;
+std::vector<std::array<double, 3>> source_points = ...;
 
 RegistrationSetting setting;
 setting.num_threads = 4;                    // Number of threads to be used
 setting.downsampling_resolution = 0.25;     // Downsampling resolution
 setting.max_correspondence_distance = 1.0;  // Maximum correspondence distance between points (e.g., triming threshold)
 
-Eigen::Isometry3d init_T_target_source = Eigen::Isometry3d::Identity();
+const auto init_T_target_source = earth::mantle::math::identityMatrix<double, 4>();
 RegistrationResult result = align(target_points, source_points, init_T_target_source, setting);
 
 auto T = result.T_target_source;             // Native 4x4 source-to-target transform
@@ -102,8 +104,8 @@ There is also a way to perform preprocessing and registration separately. This e
 ```cpp
 #include <small_gicp/registration/registration_helper.hpp>
 
-std::vector<Eigen::Vector3d> target_points = ...;   // Any of Eigen::Vector(3|4)(f|d) can be used
-std::vector<Eigen::Vector3d> source_points = ...;   // 
+std::vector<std::array<double, 3>> target_points = ...;
+std::vector<std::array<double, 3>> source_points = ...;
 
 int num_threads = 4;                    // Number of threads to be used
 double downsampling_resolution = 0.25;  // Downsampling resolution
@@ -117,7 +119,7 @@ RegistrationSetting setting;
 setting.num_threads = num_threads;
 setting.max_correspondence_distance = 1.0;  // Maximum correspondence distance between points (e.g., triming threshold)
 
-Eigen::Isometry3d init_T_target_source = Eigen::Isometry3d::Identity();
+const auto init_T_target_source = earth::mantle::math::identityMatrix<double, 4>();
 RegistrationResult result = align(*target, *source, *target_tree, init_T_target_source, setting);
 
 auto T = result.T_target_source;             // Native 4x4 source-to-target transform
@@ -193,7 +195,7 @@ registration.reduction.num_threads = num_threads;
 registration.rejector.max_dist_sq = 1.0;
 
 // Align point clouds. Note that the input point clouds are pcl::PointCloud<pcl::PointCovariance>.
-auto result = registration.align(*target, *source, *target_tree, Eigen::Isometry3d::Identity());
+auto result = registration.align(*target, *source, *target_tree);
 ```
 
 </details>
@@ -211,8 +213,8 @@ If you want to fine-control and customize the registration process, use `small_g
 #include <small_gicp/registration/reduction_omp.hpp>
 #include <small_gicp/registration/registration.hpp>
 
-std::vector<Eigen::Vector3d> target_points = ...;   // Any of Eigen::Vector(3|4)(f|d) can be used
-std::vector<Eigen::Vector3d> source_points = ...;   // 
+std::vector<std::array<double, 3>> target_points = ...;
+std::vector<std::array<double, 3>> source_points = ...;
 
 int num_threads = 4;
 double downsampling_resolution = 0.25;

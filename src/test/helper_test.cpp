@@ -116,11 +116,11 @@ TEST_CASE_FIXTURE(HelperTest, "HelperTest.AlignEigen") {
       }
 
       // Forward test
-      auto result = align(target_eigen, source_eigen, Eigen::Isometry3d::Identity(), setting);
+      auto result = align(target_eigen, source_eigen, earth::mantle::math::identityMatrix<double, 4>(), setting);
       CHECK((compare_transformation(T_target_source, eigen_transform(result.T_target_source))));
 
       // Backward test
-      auto result2 = align(source_eigen, target_eigen, Eigen::Isometry3d::Identity(), setting);
+      auto result2 = align(source_eigen, target_eigen, earth::mantle::math::identityMatrix<double, 4>(), setting);
       CHECK((compare_transformation(T_target_source, eigen_transform(result2.T_target_source).inverse())));
     }
   }
@@ -151,19 +151,19 @@ TEST_CASE_FIXTURE(HelperTest, "HelperTest.AlignSmall") {
 
       // Forward test
       if (method != "VGICP") {
-        result = align(*target, *source, *target_tree, Eigen::Isometry3d::Identity(), setting);
+        result = align(*target, *source, *target_tree, earth::mantle::math::identityMatrix<double, 4>(), setting);
       } else {
         auto target_voxelmap = create_gaussian_voxelmap(*target, 1.0);
-        result = align(*target_voxelmap, *source, Eigen::Isometry3d::Identity(), setting);
+        result = align(*target_voxelmap, *source, earth::mantle::math::identityMatrix<double, 4>(), setting);
       }
       CHECK((compare_transformation(T_target_source, eigen_transform(result.T_target_source))));
 
       // Backward test
       if (method != "VGICP") {
-        result = align(*source, *target, *source_tree, Eigen::Isometry3d::Identity(), setting);
+        result = align(*source, *target, *source_tree, earth::mantle::math::identityMatrix<double, 4>(), setting);
       } else {
         auto source_voxelmap = create_gaussian_voxelmap(*source, 1.0);
-        result = align(*source_voxelmap, *target, Eigen::Isometry3d::Identity(), setting);
+        result = align(*source_voxelmap, *target, earth::mantle::math::identityMatrix<double, 4>(), setting);
       }
       CHECK((compare_transformation(T_target_source, eigen_transform(result.T_target_source).inverse())));
     }

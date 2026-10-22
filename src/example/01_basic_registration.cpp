@@ -17,7 +17,7 @@ void example1(const std::vector<Eigen::Vector4f>& target_points, const std::vect
   setting.max_correspondence_distance = 1.0;  // Maximum correspondence distance between points (e.g., triming threshold)
 
   Eigen::Isometry3d init_T_target_source = Eigen::Isometry3d::Identity();
-  RegistrationResult result = align(target_points, source_points, init_T_target_source, setting);
+  RegistrationResult result = align(target_points, source_points, native_transform(init_T_target_source), setting);
 
   std::cout << "--- T_target_source ---" << std::endl << small_gicp::eigen_transform(result.T_target_source).matrix() << std::endl;
   std::cout << "converged:" << result.converged << std::endl;
@@ -43,7 +43,7 @@ void example2(const std::vector<Eigen::Vector4f>& target_points, const std::vect
   setting.max_correspondence_distance = 1.0;  // Maximum correspondence distance between points (e.g., triming threshold)
 
   Eigen::Isometry3d init_T_target_source = Eigen::Isometry3d::Identity();
-  RegistrationResult result = align(*target, *source, *target_tree, init_T_target_source, setting);
+  RegistrationResult result = align(*target, *source, *target_tree, native_transform(init_T_target_source), setting);
 
   std::cout << "--- T_target_source ---" << std::endl << small_gicp::eigen_transform(result.T_target_source).matrix() << std::endl;
   std::cout << "converged:" << result.converged << std::endl;
@@ -54,7 +54,7 @@ void example2(const std::vector<Eigen::Vector4f>& target_points, const std::vect
   std::cout << "--- b ---" << std::endl << small_gicp::eigen_view(result.b).transpose() << std::endl;
 
   // Preprocessed points and trees can be reused for the next registration for efficiency
-  RegistrationResult result2 = align(*source, *target, *source_tree, Eigen::Isometry3d::Identity(), setting);
+  RegistrationResult result2 = align(*source, *target, *source_tree, earth::mantle::math::identityMatrix<double, 4>(), setting);
 }
 
 int main(int argc, char** argv) {

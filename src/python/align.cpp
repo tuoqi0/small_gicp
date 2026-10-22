@@ -91,7 +91,7 @@ void define_align(py::module& m) {
         }
       }
 
-      return align(target, source, Eigen::Isometry3d(init_T_target_source), setting);
+      return align(target, source, native_transform(Eigen::Isometry3d(init_T_target_source)), setting);
     },
     py::arg("target_points"),
     py::arg("source_points"),
@@ -181,7 +181,7 @@ void define_align(py::module& m) {
       if (target_tree == nullptr) {
         target_tree = std::make_shared<KdTree<PointCloud>>(target, KdTreeBuilderOMP(num_threads));
       }
-      return align(*target, *source, *target_tree, Eigen::Isometry3d(init_T_target_source), setting);
+      return align(*target, *source, *target_tree, native_transform(Eigen::Isometry3d(init_T_target_source)), setting);
     },
     py::arg("target"),
     py::arg("source"),

@@ -9,12 +9,12 @@
   <license>MIT</license>
 
   <buildtool_depend>cmake</buildtool_depend>
-  <depend>eigen</depend>
   <depend>slam_math</depend>
   <depend>libomp-dev</depend>
   <test_depend>robot_core</test_depend>
 
   <!-- optional -->
+  <!-- Eigen is used by optional Python/PCL adapters and reference programs. -->
   <!-- <depend>libpcl-all-dev</depend> -->
   <!-- <depend>tbb</depend> -->
 
