@@ -3,9 +3,11 @@
 #pragma once
 
 #include <array>
-#include <Eigen/Core>
-#include <Eigen/Eigen>
+#include <cstddef>
+#include <iterator>
+#include <collection/fixed_matrix.h>
 #include <math/symmetric_eigen3.h>
+#include <small_gicp/points/traits.hpp>
 
 namespace small_gicp {
 
@@ -21,7 +23,8 @@ public:
   /// @brief Project the point to the selected axis.
   /// @param pt  Point to project
   /// @return    Projected value
-  double operator()(const Eigen::Vector4d& pt) const { return pt[axis]; }
+  template <typename Point>
+  double operator()(const Point& pt) const { return pt[axis]; }
 
   /// @brief Find the axis with the largest variance.
   /// @param points     Point cloud
@@ -32,20 +35,25 @@ public:
   template <typename PointCloud, typename IndexConstIterator>
   static AxisAlignedProjection find_axis(const PointCloud& points, IndexConstIterator first, IndexConstIterator last, const ProjectionSetting& setting) {
     const size_t N = std::distance(first, last);
-    Eigen::Vector4d sum_pt = Eigen::Vector4d::Zero();
-    Eigen::Vector4d sum_sq = Eigen::Vector4d::Zero();
+    earth::mantle::collection::Matrix<double, 4, 1> sum_pt{};
+    earth::mantle::collection::Matrix<double, 3, 1> sum_sq{};
 
-    const size_t step = N < setting.max_scan_count ? 1 : N / setting.max_scan_count;
+    const size_t max_scan_count = static_cast<size_t>(setting.max_scan_count);
+    const size_t step = N < max_scan_count ? 1 : N / max_scan_count;
     const size_t num_steps = N / step;
-    for (int i = 0; i < num_steps; i++) {
+    for (size_t i = 0; i < num_steps; i++) {
       const auto itr = first + step * i;
-      const Eigen::Vector4d pt = traits::point(points, *itr);
-      sum_pt += pt;
-      sum_sq += pt.cwiseProduct(pt);
+      const auto pt = traits::point(points, *itr);
+      for (size_t axis = 0; axis < 3; ++axis) {
+        sum_pt[axis][0] += pt[axis];
+        sum_sq[axis][0] += pt[axis] * pt[axis];
+      }
+      sum_pt[3][0] += pt[3];
     }
 
-    const Eigen::Vector4d mean = sum_pt / sum_pt.w();
-    const Eigen::Vector4d var = (sum_sq - mean.cwiseProduct(sum_pt));
+    std::array<double, 3> var{};
+    for (size_t axis = 0; axis < 3; ++axis)
+      var[axis] = sum_sq[axis][0] - (sum_pt[axis][0] / sum_pt[3][0]) * sum_pt[axis][0];
 
     return AxisAlignedProjection{var[0] > var[1] ? (var[0] > var[2] ? 0 : 2) : (var[1] > var[2] ? 1 : 2)};
   }
@@ -61,7 +69,10 @@ public:
   /// @brief Project the point to the normal direction.
   /// @param pt   Point to project
   /// @return     Projected value
-  double operator()(const Eigen::Vector4d& pt) const { return Eigen::Map<const Eigen::Vector3d>(normal.data()).dot(pt.head<3>()); }
+  template <typename Point>
+  double operator()(const Point& pt) const {
+    return normal[0] * pt[0] + normal[1] * pt[1] + normal[2] * pt[2];
+  }
 
   /// @brief  Find the direction with the largest variance.
   /// @param points   Point cloud
@@ -72,28 +83,32 @@ public:
   template <typename PointCloud, typename IndexConstIterator>
   static NormalProjection find_axis(const PointCloud& points, IndexConstIterator first, IndexConstIterator last, const ProjectionSetting& setting) {
     const size_t N = std::distance(first, last);
-    Eigen::Vector4d sum_pt = Eigen::Vector4d::Zero();
-    Eigen::Matrix4d sum_sq = Eigen::Matrix4d::Zero();
+    NormalProjection p{{1, 0, 0}};
+    earth::mantle::collection::Matrix<double, 4, 1> sum_pt{};
+    earth::mantle::collection::Matrix<double, 3, 3> sum_sq{};
 
-    const size_t step = N < setting.max_scan_count ? 1 : N / setting.max_scan_count;
+    const size_t max_scan_count = static_cast<size_t>(setting.max_scan_count);
+    const size_t step = N < max_scan_count ? 1 : N / max_scan_count;
     const size_t num_steps = N / step;
-    for (int i = 0; i < num_steps; i++) {
+    for (size_t i = 0; i < num_steps; i++) {
       const auto itr = first + step * i;
-      const Eigen::Vector4d pt = traits::point(points, *itr);
-      sum_pt += pt;
-      sum_sq += pt * pt.transpose();
+      const auto pt = traits::point(points, *itr);
+      for (size_t row = 0; row < 3; ++row) {
+        sum_pt[row][0] += pt[row];
+        for (size_t col = 0; col < 3; ++col)
+          sum_sq[row][col] += pt[row] * pt[col];
+      }
+      sum_pt[3][0] += pt[3];
     }
 
-    const Eigen::Vector4d mean = sum_pt / sum_pt.w();
-    const Eigen::Matrix4d cov = (sum_sq - mean * sum_pt.transpose()) / sum_pt.w();
-
     std::array<double, 9> covariance{};
-    for (std::size_t row = 0; row < 3; ++row)
+    for (std::size_t row = 0; row < 3; ++row) {
+      const double mean = sum_pt[row][0] / sum_pt[3][0];
       for (std::size_t col = 0; col < 3; ++col)
-        covariance[row * 3 + col] = cov(static_cast<int>(row), static_cast<int>(col));
+        covariance[row * 3 + col] = (sum_sq[row][col] - mean * sum_pt[col][0]) / sum_pt[3][0];
+    }
     earth::mantle::math::SymmetricEigen3 spectrum;
     // A coordinate axis is still a valid KD-tree split if covariance is invalid.
-    NormalProjection p{{1, 0, 0}};
     if (!earth::mantle::math::symmetricEigen3(covariance, spectrum)) return p;
     for (std::size_t row = 0; row < 3; ++row) p.normal[row] = spectrum.vectors[row * 3 + 2];
     return p;

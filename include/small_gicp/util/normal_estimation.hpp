@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <Eigen/Eigen>
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <vector>
+#include <collection/fixed_matrix.h>
 #include <math/symmetric_eigen3.h>
 #include <small_gicp/ann/kdtree.hpp>
 
@@ -13,16 +17,18 @@ namespace small_gicp {
 template <typename PointCloud>
 struct NormalSetter {
   /// @brief Handle invalid case (too few points).
-  static void set_invalid(PointCloud& cloud, size_t i) { traits::set_normal(cloud, i, Eigen::Vector4d::Zero()); }
+  static void set_invalid(PointCloud& cloud, size_t i) { traits::set_normal(cloud, i, std::array<double, 4>{}); }
 
   /// @brief Compute and set the normal to the point cloud.
-  static void set(PointCloud& cloud, size_t i, const Eigen::Matrix3d& eigenvectors) {
-    const Eigen::Vector4d normal = (Eigen::Vector4d() << eigenvectors.col(0).normalized(), 0.0).finished();
-    if (traits::point(cloud, i).dot(normal) > 0) {
-      traits::set_normal(cloud, i, -normal);
-    } else {
-      traits::set_normal(cloud, i, normal);
-    }
+  static void set(PointCloud& cloud, size_t i, const earth::mantle::math::SymmetricEigen3& eig) {
+    const double x = eig.vectors[0], y = eig.vectors[3], z = eig.vectors[6];
+    const double norm = std::sqrt(x * x + y * y + z * z);
+    std::array<double, 4> normal{x / norm, y / norm, z / norm, 0.0};
+    const auto point = traits::point(cloud, i);
+    const double facing = (point[0] * normal[0] + point[2] * normal[2]) +
+                          (point[1] * normal[1] + point[3] * normal[3]);
+    if (facing > 0) for (double& value : normal) value = -value;
+    traits::set_normal(cloud, i, normal);
   }
 };
 
@@ -32,16 +38,21 @@ template <typename PointCloud>
 struct CovarianceSetter {
   /// @brief Handle invalid case (too few points).
   static void set_invalid(PointCloud& cloud, size_t i) {
-    Eigen::Matrix4d cov = Eigen::Matrix4d::Identity();
-    cov(3, 3) = 0.0;
+    earth::mantle::collection::Matrix<double, 4, 4> cov{};
+    for (size_t axis = 0; axis < 3; ++axis) cov[axis][axis] = 1.0;
     traits::set_cov(cloud, i, cov);
   }
 
   /// @brief Compute and set the covariance to the point cloud.
-  static void set(PointCloud& cloud, size_t i, const Eigen::Matrix3d& eigenvectors) {
-    const Eigen::Vector3d values(1e-3, 1.0, 1.0);
-    Eigen::Matrix4d cov = Eigen::Matrix4d::Zero();
-    cov.block<3, 3>(0, 0) = eigenvectors * values.asDiagonal() * eigenvectors.transpose();
+  static void set(PointCloud& cloud, size_t i, const earth::mantle::math::SymmetricEigen3& eig) {
+    const std::array<double, 3> values{{1e-3, 1.0, 1.0}};
+    earth::mantle::collection::Matrix<double, 4, 4> cov{};
+    for (size_t row = 0; row < 3; ++row) {
+      for (size_t col = 0; col < 3; ++col) {
+        for (size_t axis = 0; axis < 3; ++axis)
+          cov[row][col] += eig.vectors[row * 3 + axis] * values[axis] * eig.vectors[col * 3 + axis];
+      }
+    }
     traits::set_cov(cloud, i, cov);
   }
 };
@@ -57,9 +68,9 @@ struct NormalCovarianceSetter {
   }
 
   /// @brief Compute and set the normal and covariance to the point cloud.
-  static void set(PointCloud& cloud, size_t i, const Eigen::Matrix3d& eigenvectors) {
-    NormalSetter<PointCloud>::set(cloud, i, eigenvectors);
-    CovarianceSetter<PointCloud>::set(cloud, i, eigenvectors);
+  static void set(PointCloud& cloud, size_t i, const earth::mantle::math::SymmetricEigen3& eig) {
+    NormalSetter<PointCloud>::set(cloud, i, eig);
+    CovarianceSetter<PointCloud>::set(cloud, i, eig);
   }
 };
 
@@ -75,31 +86,35 @@ void estimate_local_features(PointCloud& cloud, Tree& kdtree, int num_neighbors,
     return;
   }
 
-  Eigen::Vector4d sum_points = Eigen::Vector4d::Zero();
-  Eigen::Matrix4d sum_cross = Eigen::Matrix4d::Zero();
+  earth::mantle::collection::Matrix<double, 3, 1> sum_points{};
+  earth::mantle::collection::Matrix<double, 3, 3> sum_cross{};
   for (size_t i = 0; i < n; i++) {
     const auto& pt = traits::point(cloud, k_indices[i]);
-    sum_points += pt;
-    sum_cross += pt * pt.transpose();
+    for (size_t row = 0; row < 3; ++row) {
+      sum_points[row][0] += pt[row];
+      for (size_t col = 0; col <= row; ++col)
+        sum_cross[row][col] += pt[row] * pt[col];
+    }
   }
 
-  const Eigen::Vector4d mean = sum_points / n;
-  const Eigen::Matrix4d cov = (sum_cross - mean * sum_points.transpose()) / n;
-
+  // Match the original population covariance and its lower-triangle input.
+  // The homogeneous fourth coordinate does not enter the 3D eigensystem.
   std::array<double, 9> covariance{};
-  for (int row = 0; row < 3; ++row)
-    for (int col = 0; col < 3; ++col)
-      covariance[static_cast<std::size_t>(row * 3 + col)] = cov(std::max(row, col), std::min(row, col));
+  const double count = static_cast<double>(n);
+  for (size_t row = 0; row < 3; ++row) {
+    const double mean = sum_points[row][0] / count;
+    for (size_t col = 0; col <= row; ++col) {
+      const double value = (sum_cross[row][col] - mean * sum_points[col][0]) / count;
+      covariance[row * 3 + col] = value;
+      covariance[col * 3 + row] = value;
+    }
+  }
   earth::mantle::math::SymmetricEigen3 eig;
   if (!earth::mantle::math::symmetricEigen3(covariance, eig)) {
     Setter::set_invalid(cloud, point_index);
     return;
   }
-  Eigen::Matrix3d vectors;
-  for (int row = 0; row < 3; ++row)
-    for (int col = 0; col < 3; ++col)
-      vectors(row, col) = eig.vectors[static_cast<std::size_t>(row * 3 + col)];
-  Setter::set(cloud, point_index, vectors);
+  Setter::set(cloud, point_index, eig);
 }
 
 template <typename Setter, typename PointCloud, typename KdTree>
