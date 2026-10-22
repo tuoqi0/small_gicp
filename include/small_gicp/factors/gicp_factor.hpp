@@ -4,8 +4,9 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <math/fixed_matrix_ops.h>
 #include <math/positive_definite_solve.h>
-#include <small_gicp/util/lie.hpp>
+#include <small_gicp/factors/linearization.hpp>
 #include <small_gicp/ann/traits.hpp>
 #include <small_gicp/points/traits.hpp>
 
@@ -19,7 +20,7 @@ struct GICPFactor {
   GICPFactor(const Setting& setting = Setting())
   : target_index(std::numeric_limits<size_t>::max()),
     source_index(std::numeric_limits<size_t>::max()),
-    mahalanobis(Eigen::Matrix4d::Zero()) {}
+    mahalanobis{} {}
 
   /// @brief Linearize the factor
   /// @param target       Target point cloud
@@ -47,7 +48,18 @@ struct GICPFactor {
     this->source_index = source_index;
     this->target_index = std::numeric_limits<size_t>::max();
 
-    const Eigen::Vector4d transed_source_pt = T * traits::point(source, source_index);
+    using earth::mantle::collection::Matrix;
+    using earth::mantle::math::operator*;
+    using earth::mantle::math::operator+;
+    using Packed4 = Eigen::Matrix<double, 4, 4, Eigen::RowMajor>;
+    using Packed3 = Eigen::Matrix<double, 3, 3, Eigen::RowMajor>;
+    // Copy Eigen storage only at the point/transform API boundary. All fixed
+    // matrix products below use Mantle's existing row-major operations.
+    const Packed4 packed_transform = T.matrix();
+    const auto transform = Matrix<double, 4, 4>::from(packed_transform.data(), 16);
+    const auto source_point = traits::point(source, source_index);
+    const auto transformed = transform * Matrix<double, 4, 1>::from(source_point.data(), 4);
+    const Eigen::Map<const Eigen::Vector4d> transed_source_pt(transformed.raw_pointer());
 
     size_t k_index;
     double k_sq_dist;
@@ -55,30 +67,25 @@ struct GICPFactor {
       return false;
     }
 
-    const Eigen::Matrix4d RCR = traits::cov(target, k_index) + T.matrix() * traits::cov(source, source_index) * T.matrix().transpose();
-    std::array<std::array<double, 3>, 3> covariance{}, identity{}, precision{};
-    for (std::size_t row = 0; row < 3; ++row) {
-      identity[row][row] = 1;
-      for (std::size_t col = 0; col < 3; ++col)
-        covariance[row][col] = RCR(static_cast<int>(row), static_cast<int>(col));
-    }
-    // Point covariances must be positive definite. Do not add damping here.
-    if (!earth::mantle::math::solvePositiveDefinite(covariance, identity, precision)) return false;
-    mahalanobis.setZero();
-    for (std::size_t row = 0; row < 3; ++row)
-      for (std::size_t col = 0; col < 3; ++col)
-        mahalanobis(static_cast<int>(row), static_cast<int>(col)) = precision[row][col];
+    const Packed4 packed_source_covariance = traits::cov(source, source_index);
+    const Packed4 packed_target_covariance = traits::cov(target, k_index);
+    const auto source_covariance = Matrix<double, 4, 4>::from(packed_source_covariance.data(), 16);
+    const auto target_covariance = Matrix<double, 4, 4>::from(packed_target_covariance.data(), 16);
+    Matrix<double, 4, 4> weight{};
+    if (!factor_detail::gicpPrecision(target_covariance, source_covariance, transform, weight)) return false;
+    mahalanobis = weight;
     target_index = k_index;
 
-    const Eigen::Vector4d residual = traits::point(target, target_index) - transed_source_pt;
-
-    Eigen::Matrix<double, 4, 6> J = Eigen::Matrix<double, 4, 6>::Zero();
-    J.block<3, 3>(0, 0) = T.linear() * skew(traits::point(source, source_index).template head<3>());
-    J.block<3, 3>(0, 3) = -T.linear();
-
-    *H = J.transpose() * mahalanobis * J;
-    *b = J.transpose() * mahalanobis * residual;
-    *e = 0.5 * residual.transpose() * mahalanobis * residual;
+    const auto target_point = traits::point(target, target_index);
+    const auto residual = Matrix<double, 4, 1>::from(target_point.data(), 4) + (-1.0) * transformed;
+    const Packed3 packed_rotation = T.linear();
+    const auto rotation = Matrix<double, 3, 3>::from(packed_rotation.data(), 9);
+    const auto jacobian = factor_detail::pointJacobian(Matrix<double, 4, 1>::from(source_point.data(), 4), rotation);
+    factor_detail::Hessian hessian{};
+    factor_detail::Gradient gradient{};
+    factor_detail::linearizeResidual(jacobian, residual, weight, hessian, gradient, *e);
+    *H = Eigen::Map<const Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>(hessian.raw_pointer());
+    *b = Eigen::Map<const Eigen::Matrix<double, 6, 1>>(gradient.raw_pointer());
 
     return true;
   }
@@ -94,9 +101,18 @@ struct GICPFactor {
       return 0.0;
     }
 
-    const Eigen::Vector4d transed_source_pt = T * traits::point(source, source_index);
-    const Eigen::Vector4d residual = traits::point(target, target_index) - transed_source_pt;
-    return 0.5 * residual.transpose() * mahalanobis * residual;
+    using earth::mantle::collection::Matrix;
+    using earth::mantle::math::operator*;
+    using earth::mantle::math::operator+;
+    using Packed4 = Eigen::Matrix<double, 4, 4, Eigen::RowMajor>;
+    const Packed4 packed_transform = T.matrix();
+    const auto transform = Matrix<double, 4, 4>::from(packed_transform.data(), 16);
+    const auto& weight = mahalanobis;
+    const auto source_point = traits::point(source, source_index);
+    const auto target_point = traits::point(target, target_index);
+    const auto transformed = transform * Matrix<double, 4, 1>::from(source_point.data(), 4);
+    const auto residual = Matrix<double, 4, 1>::from(target_point.data(), 4) + (-1.0) * transformed;
+    return factor_detail::squaredError(residual, weight);
   }
 
   /// @brief Returns true if this factor is not rejected as an outlier
@@ -104,6 +120,6 @@ struct GICPFactor {
 
   size_t target_index;          ///< Target point index
   size_t source_index;          ///< Source point index
-  Eigen::Matrix4d mahalanobis;  ///< Fused precision matrix
+  earth::mantle::collection::Matrix<double, 4, 4> mahalanobis;  ///< Owned fused precision
 };
 }  // namespace small_gicp
