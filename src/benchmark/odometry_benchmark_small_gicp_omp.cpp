@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 #include <small_gicp/benchmark/benchmark_odom.hpp>
 
 #include <small_gicp/factors/gicp_factor.hpp>
@@ -35,10 +36,10 @@ public:
     registration.reduction.num_threads = params.num_threads;
 
     // Perform registration
-    auto result = registration.align(*target_points, *points, *target_tree, Eigen::Isometry3d::Identity());
+    auto result = registration.align(*target_points, *points, *target_tree, small_gicp::native_transform(Eigen::Isometry3d::Identity()));
 
     // Update T_world_lidar and target points
-    T_world_lidar = T_world_lidar * result.T_target_source;
+    T_world_lidar = T_world_lidar * small_gicp::eigen_transform(result.T_target_source);
     target_points = points;
     target_tree = tree;
 

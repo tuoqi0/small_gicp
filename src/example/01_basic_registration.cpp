@@ -19,7 +19,7 @@ void example1(const std::vector<Eigen::Vector4f>& target_points, const std::vect
   Eigen::Isometry3d init_T_target_source = Eigen::Isometry3d::Identity();
   RegistrationResult result = align(target_points, source_points, init_T_target_source, setting);
 
-  std::cout << "--- T_target_source ---" << std::endl << result.T_target_source.matrix() << std::endl;
+  std::cout << "--- T_target_source ---" << std::endl << small_gicp::eigen_transform(result.T_target_source).matrix() << std::endl;
   std::cout << "converged:" << result.converged << std::endl;
   std::cout << "error:" << result.error << std::endl;
   std::cout << "iterations:" << result.iterations << std::endl;
@@ -45,7 +45,7 @@ void example2(const std::vector<Eigen::Vector4f>& target_points, const std::vect
   Eigen::Isometry3d init_T_target_source = Eigen::Isometry3d::Identity();
   RegistrationResult result = align(*target, *source, *target_tree, init_T_target_source, setting);
 
-  std::cout << "--- T_target_source ---" << std::endl << result.T_target_source.matrix() << std::endl;
+  std::cout << "--- T_target_source ---" << std::endl << small_gicp::eigen_transform(result.T_target_source).matrix() << std::endl;
   std::cout << "converged:" << result.converged << std::endl;
   std::cout << "error:" << result.error << std::endl;
   std::cout << "iterations:" << result.iterations << std::endl;

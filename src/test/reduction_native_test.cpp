@@ -18,7 +18,7 @@ struct SyntheticFactor {
   double weight{0};
 
   template <typename Rejector>
-  bool linearize(const int&, const int&, const int&, const Eigen::Isometry3d&,
+  bool linearize(const int&, const int&, const int&, const small_gicp::Transform&,
                  size_t, const Rejector&, small_gicp::factor_detail::Hessian* hessian,
                  small_gicp::factor_detail::Gradient* gradient, double* error) {
     // Rejected factors deliberately write outputs: reducers must skip them.
@@ -31,7 +31,7 @@ struct SyntheticFactor {
     return accepted;
   }
 
-  double error(const int&, const int&, const Eigen::Isometry3d&) const {
+  double error(const int&, const int&, const small_gicp::Transform&) const {
     return accepted ? 0.5 * weight : 0;
   }
 };
@@ -51,17 +51,17 @@ void checkReduction(const Reduction& reduction, size_t count, bool reject_all) {
     small_gicp::factor_detail::Hessian hessian{};
     small_gicp::factor_detail::Gradient gradient{};
     double error = 0;
-    factors.back().linearize(0, 0, 0, Eigen::Isometry3d::Identity(), i, 0,
+    factors.back().linearize(0, 0, 0, earth::mantle::math::identityMatrix<double, 4>(), i, 0,
                             &hessian, &gradient, &error);
     expected_hessian += small_gicp::eigen_view(hessian);
     expected_gradient += small_gicp::eigen_view(gradient);
     expected_error += error;
   }
-  const auto result = reduction.linearize(0, 0, 0, 0, Eigen::Isometry3d::Identity(), factors);
+  const auto result = reduction.linearize(0, 0, 0, 0, earth::mantle::math::identityMatrix<double, 4>(), factors);
   CHECK(small_gicp::eigen_view(std::get<0>(result)) == expected_hessian);
   CHECK(small_gicp::eigen_view(std::get<1>(result)) == expected_gradient);
   CHECK(std::get<2>(result) == expected_error);
-  CHECK(reduction.error(0, 0, Eigen::Isometry3d::Identity(), factors) == expected_error);
+  CHECK(reduction.error(0, 0, earth::mantle::math::identityMatrix<double, 4>(), factors) == expected_error);
 }
 }
 
@@ -114,7 +114,7 @@ TEST_CASE("native OpenMP reduction retains GICP pose recovery") {
     const auto result = registration.align(target, source, tree);
     REQUIRE(result.converged);
     CHECK(result.num_inliers == source.size());
-    CHECK((result.T_target_source.translation() - offset).norm() < 1e-3);
-    CHECK((result.T_target_source.linear() - Eigen::Matrix3d::Identity()).norm() < 1e-3);
+    CHECK((small_gicp::eigen_transform(result.T_target_source).translation() - offset).norm() < 1e-3);
+    CHECK((small_gicp::eigen_transform(result.T_target_source).linear() - Eigen::Matrix3d::Identity()).norm() < 1e-3);
   }
 }

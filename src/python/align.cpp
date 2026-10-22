@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 #include <iostream>
@@ -38,11 +39,11 @@ void define_align(py::module& m) {
       bool verbose) {
       if (target_points.cols() != 3 && target_points.cols() != 4) {
         std::cerr << "target_points must be Nx3 or Nx4" << std::endl;
-        return RegistrationResult(Eigen::Isometry3d::Identity());
+        return RegistrationResult{};
       }
       if (source_points.cols() != 3 && source_points.cols() != 4) {
         std::cerr << "source_points must be Nx3 or Nx4" << std::endl;
-        return RegistrationResult(Eigen::Isometry3d::Identity());
+        return RegistrationResult{};
       }
 
       RegistrationSetting setting;
@@ -56,7 +57,7 @@ void define_align(py::module& m) {
         setting.type = RegistrationSetting::VGICP;
       } else {
         std::cerr << "invalid registration type" << std::endl;
-        return RegistrationResult(Eigen::Isometry3d::Identity());
+        return RegistrationResult{};
       }
 
       setting.voxel_resolution = voxel_resolution;
@@ -168,7 +169,7 @@ void define_align(py::module& m) {
         setting.type = RegistrationSetting::GICP;
       } else {
         std::cerr << "invalid registration type:" << registration_type << std::endl;
-        return RegistrationResult(Eigen::Isometry3d::Identity());
+        return RegistrationResult{};
       }
       setting.max_correspondence_distance = max_correspondence_distance;
       setting.num_threads = num_threads;
@@ -250,7 +251,7 @@ void define_align(py::module& m) {
       registration.criteria.translation_eps = translation_epsilon;
       registration.optimizer.verbose = verbose;
 
-      return registration.align(target_voxelmap, source, target_voxelmap, Eigen::Isometry3d(init_T_target_source));
+      return registration.align(target_voxelmap, source, target_voxelmap, small_gicp::native_transform(Eigen::Isometry3d(init_T_target_source)));
     },
     py::arg("target_voxelmap"),
     py::arg("source"),

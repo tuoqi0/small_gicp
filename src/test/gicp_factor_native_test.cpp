@@ -44,7 +44,7 @@ TEST_CASE("GICP precision and linearization agree with the original inverse") {
     small_gicp::factor_detail::Gradient native_gradient{};
     auto gradient = small_gicp::eigen_view(native_gradient);
     double error;
-    REQUIRE(factor.linearize(target, source, tree, transform, 0, Accept{},
+    REQUIRE(factor.linearize(target, source, tree, small_gicp::native_transform(transform), 0, Accept{},
                              &native_hessian, &native_gradient, &error));
     REQUIRE(factor.inlier());
     const Eigen::Matrix4d covariance =
@@ -69,7 +69,7 @@ TEST_CASE("GICP precision and linearization agree with the original inverse") {
     candidate.translation()+=Eigen::Vector3d(.03,-.01,.02);
     const Eigen::Vector4d candidate_residual=target.point(0)-candidate*source.point(0);
     const double candidate_error=.5*candidate_residual.dot(inverse*candidate_residual);
-    CHECK(factor.error(target,source,candidate)==doctest::Approx(candidate_error).epsilon(1e-11));
+    CHECK(factor.error(target,source,small_gicp::native_transform(candidate))==doctest::Approx(candidate_error).epsilon(1e-11));
   }
 }
 
@@ -88,12 +88,12 @@ TEST_CASE("Invalid point covariance rejects the factor without publishing partia
     small_gicp::factor_detail::Gradient native_gradient = small_gicp::native_matrix(Eigen::Matrix<double, 6, 1>::Constant(8));
     auto gradient = small_gicp::eigen_view(native_gradient);
     double error = 9;
-    CHECK_FALSE(factor.linearize(target, source, tree, Eigen::Isometry3d::Identity(), 0,
+    CHECK_FALSE(factor.linearize(target, source, tree, small_gicp::native_transform(Eigen::Isometry3d::Identity()), 0,
                                  Accept{}, &native_hessian, &native_gradient, &error));
     CHECK_FALSE(factor.inlier());
     CHECK((hessian.array() == 7).all());
     CHECK((gradient.array() == 8).all());
     CHECK(error == 9);
-    CHECK(factor.error(target, source, Eigen::Isometry3d::Identity()) == 0);
+    CHECK(factor.error(target, source, small_gicp::native_transform(Eigen::Isometry3d::Identity())) == 0);
   }
 }

@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+#include <small_gicp/util/lie.hpp>
 #include <math/fixed_matrix_ops.h>
 #include <math/positive_definite_solve.h>
 #include <small_gicp/factors/linearization.hpp>
@@ -38,7 +37,7 @@ struct GICPFactor {
     const TargetPointCloud& target,
     const SourcePointCloud& source,
     const TargetTree& target_tree,
-    const Eigen::Isometry3d& T,
+    const Transform& T,
     size_t source_index,
     const CorrespondenceRejector& rejector,
     factor_detail::Hessian* H,
@@ -51,15 +50,11 @@ struct GICPFactor {
     using earth::mantle::collection::Matrix;
     using earth::mantle::math::operator*;
     using earth::mantle::math::operator+;
-    using Packed4 = Eigen::Matrix<double, 4, 4, Eigen::RowMajor>;
-    using Packed3 = Eigen::Matrix<double, 3, 3, Eigen::RowMajor>;
-    // Copy Eigen storage only at the point/transform API boundary. All fixed
-    // matrix products below use Mantle's existing row-major operations.
-    const Packed4 packed_transform = T.matrix();
-    const auto transform = Matrix<double, 4, 4>::from(packed_transform.data(), 16);
-    const auto source_point = traits::point(source, source_index);
-    const auto transformed = transform * Matrix<double, 4, 1>::from(source_point.data(), 4);
-    const Eigen::Map<const Eigen::Vector4d> transed_source_pt(transformed.raw_pointer());
+    // Point-cloud layout conversion is isolated in traits; transforms are native.
+    const auto& transform = T;
+    const auto source_point = traits::point_matrix(source, source_index);
+    const auto transformed = transform * source_point;
+    const std::array<double, 4> transed_source_pt{{transformed[0][0], transformed[1][0], transformed[2][0], transformed[3][0]}};
 
     size_t k_index;
     double k_sq_dist;
@@ -67,20 +62,17 @@ struct GICPFactor {
       return false;
     }
 
-    const Packed4 packed_source_covariance = traits::cov(source, source_index);
-    const Packed4 packed_target_covariance = traits::cov(target, k_index);
-    const auto source_covariance = Matrix<double, 4, 4>::from(packed_source_covariance.data(), 16);
-    const auto target_covariance = Matrix<double, 4, 4>::from(packed_target_covariance.data(), 16);
+    const auto source_covariance = traits::covariance_matrix(source, source_index);
+    const auto target_covariance = traits::covariance_matrix(target, k_index);
     Matrix<double, 4, 4> weight{};
     if (!factor_detail::gicpPrecision(target_covariance, source_covariance, transform, weight)) return false;
     mahalanobis = weight;
     target_index = k_index;
 
-    const auto target_point = traits::point(target, target_index);
-    const auto residual = Matrix<double, 4, 1>::from(target_point.data(), 4) + (-1.0) * transformed;
-    const Packed3 packed_rotation = T.linear();
-    const auto rotation = Matrix<double, 3, 3>::from(packed_rotation.data(), 9);
-    const auto jacobian = factor_detail::pointJacobian(Matrix<double, 4, 1>::from(source_point.data(), 4), rotation);
+    const auto target_point = traits::point_matrix(target, target_index);
+    const auto residual = target_point + (-1.0) * transformed;
+    const auto rotation = rotation_matrix(T);
+    const auto jacobian = factor_detail::pointJacobian(source_point, rotation);
     factor_detail::linearizeResidual(jacobian, residual, weight, *H, *b, *e);
 
     return true;
@@ -92,7 +84,7 @@ struct GICPFactor {
   /// @param T        Evaluation point
   /// @return Error
   template <typename TargetPointCloud, typename SourcePointCloud>
-  double error(const TargetPointCloud& target, const SourcePointCloud& source, const Eigen::Isometry3d& T) const {
+  double error(const TargetPointCloud& target, const SourcePointCloud& source, const Transform& T) const {
     if (target_index == std::numeric_limits<size_t>::max()) {
       return 0.0;
     }
@@ -100,14 +92,12 @@ struct GICPFactor {
     using earth::mantle::collection::Matrix;
     using earth::mantle::math::operator*;
     using earth::mantle::math::operator+;
-    using Packed4 = Eigen::Matrix<double, 4, 4, Eigen::RowMajor>;
-    const Packed4 packed_transform = T.matrix();
-    const auto transform = Matrix<double, 4, 4>::from(packed_transform.data(), 16);
+    const auto& transform = T;
     const auto& weight = mahalanobis;
-    const auto source_point = traits::point(source, source_index);
-    const auto target_point = traits::point(target, target_index);
-    const auto transformed = transform * Matrix<double, 4, 1>::from(source_point.data(), 4);
-    const auto residual = Matrix<double, 4, 1>::from(target_point.data(), 4) + (-1.0) * transformed;
+    const auto source_point = traits::point_matrix(source, source_index);
+    const auto target_point = traits::point_matrix(target, target_index);
+    const auto transformed = transform * source_point;
+    const auto residual = target_point + (-1.0) * transformed;
     return factor_detail::squaredError(residual, weight);
   }
 

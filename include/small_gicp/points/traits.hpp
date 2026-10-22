@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstddef>
+#include <collection/fixed_matrix.h>
 
 namespace small_gicp {
 
@@ -51,6 +52,48 @@ auto normal(const T& points, size_t i) {
 template <typename T>
 auto cov(const T& points, size_t i) {
   return Traits<T>::cov(points, i);
+}
+
+namespace detail {
+template <typename Point>
+auto coordinate(const Point& point, size_t axis) -> decltype(point[axis]) { return point[axis]; }
+template <typename T, size_t Dimension>
+const T& coordinate(const earth::mantle::collection::Matrix<T, Dimension, 1>& point, size_t axis) {
+  return point[axis][0];
+}
+template <typename Covariance>
+auto coefficient(const Covariance& covariance, size_t row, size_t col) -> decltype(covariance(row, col)) {
+  return covariance(row, col);
+}
+template <typename T, size_t Rows, size_t Cols>
+const T& coefficient(const earth::mantle::collection::Matrix<T, Rows, Cols>& covariance, size_t row, size_t col) {
+  return covariance[row][col];
+}
+}  // namespace detail
+
+// Explicit point-cloud boundary. Native matrices pass by value, as the
+// original generic getters did; external layouts are read coordinate-wise.
+template <typename T>
+earth::mantle::collection::Matrix<double, 4, 1> point_matrix(const T& points, size_t i) {
+  const auto value = point(points, i);
+  return earth::mantle::collection::Matrix<double, 4, 1>::from({
+      detail::coordinate(value, 0), detail::coordinate(value, 1),
+      detail::coordinate(value, 2), detail::coordinate(value, 3)});
+}
+template <typename T>
+earth::mantle::collection::Matrix<double, 4, 1> normal_matrix(const T& points, size_t i) {
+  const auto value = normal(points, i);
+  return earth::mantle::collection::Matrix<double, 4, 1>::from({
+      detail::coordinate(value, 0), detail::coordinate(value, 1),
+      detail::coordinate(value, 2), detail::coordinate(value, 3)});
+}
+template <typename T>
+earth::mantle::collection::Matrix<double, 4, 4> covariance_matrix(const T& points, size_t i) {
+  const auto value = cov(points, i);
+  earth::mantle::collection::Matrix<double, 4, 4> result{};
+  for (size_t row = 0; row < 4; ++row)
+    for (size_t col = 0; col < 4; ++col) result[row][col] = detail::coefficient(value, row, col);
+  return result;
 }
 
 /// @brief Resize the point cloud (this function should resize all attributes)

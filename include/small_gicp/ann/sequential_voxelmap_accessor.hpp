@@ -19,7 +19,7 @@ namespace small_gicp {
 
     // Use the voxelmap as a source point cloud
     small_gicp::Registration<small_gicp::GICPFactor, small_gicp::ParallelReductionOMP> registration;
-    auto result = registration.align(*last_voxelmap, accessor, *last_voxelmap, Eigen::Isometry3d::Identity());
+    auto result = registration.align(*last_voxelmap, accessor, *last_voxelmap);
  */
 template <typename VoxelMap>
 class SequentialVoxelMapAccessor {

@@ -92,7 +92,7 @@ setting.max_correspondence_distance = 1.0;  // Maximum correspondence distance b
 Eigen::Isometry3d init_T_target_source = Eigen::Isometry3d::Identity();
 RegistrationResult result = align(target_points, source_points, init_T_target_source, setting);
 
-Eigen::Isometry3d T = result.T_target_source;  // Estimated transformation
+auto T = result.T_target_source;             // Native 4x4 source-to-target transform
 size_t num_inliers = result.num_inliers;       // Number of inlier source points
 auto H = result.H;                          // Native Mantle Hessian matrix (6x6)
 ```
@@ -120,7 +120,7 @@ setting.max_correspondence_distance = 1.0;  // Maximum correspondence distance b
 Eigen::Isometry3d init_T_target_source = Eigen::Isometry3d::Identity();
 RegistrationResult result = align(*target, *source, *target_tree, init_T_target_source, setting);
 
-Eigen::Isometry3d T = result.T_target_source;  // Estimated transformation
+auto T = result.T_target_source;             // Native 4x4 source-to-target transform
 size_t num_inliers = result.num_inliers;       // Number of inlier source points
 auto H = result.H;                          // Native Mantle Hessian matrix (6x6)
 ```
@@ -241,10 +241,10 @@ registration.reduction.num_threads = num_threads;
 registration.rejector.max_dist_sq = max_correspondence_distance * max_correspondence_distance;
 
 // Align point clouds
-Eigen::Isometry3d init_T_target_source = Eigen::Isometry3d::Identity();
+const auto init_T_target_source = earth::mantle::math::identityMatrix<double, 4>();
 auto result = registration.align(*target, *source, *target_tree, init_T_target_source);
 
-Eigen::Isometry3d T = result.T_target_source;  // Estimated transformation
+auto T = result.T_target_source;             // Native 4x4 source-to-target transform
 size_t num_inliers = result.num_inliers;       // Number of inlier source points
 auto H = result.H;                          // Native Mantle Hessian matrix (6x6)
 ```

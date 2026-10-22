@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 #ifdef BUILD_WITH_TBB
 
 #include <small_gicp/benchmark/benchmark_odom.hpp>
@@ -36,10 +37,10 @@ public:
 
     // Registration using GICP + TBB-based parallel reduction
     Registration<GICPFactor, ParallelReductionTBB> registration;
-    auto result = registration.align(*voxelmap, *points, *voxelmap, T_world_lidar);
+    auto result = registration.align(*voxelmap, *points, *voxelmap, small_gicp::native_transform(T_world_lidar));
 
     // Update T_world_lidar with the estimated transformation
-    T_world_lidar = result.T_target_source;
+    T_world_lidar = small_gicp::eigen_transform(result.T_target_source);
 
     // Insert points to the target voxel map
     voxelmap->insert(*points, T_world_lidar);

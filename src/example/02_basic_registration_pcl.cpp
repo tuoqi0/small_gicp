@@ -65,9 +65,9 @@ void example2(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& raw_target, const 
   registration.rejector.max_dist_sq = 1.0;
 
   // Align point clouds. Note that the input point clouds are pcl::PointCloud<pcl::PointCovariance>.
-  auto result = registration.align(*target, *source, *target_tree, Eigen::Isometry3d::Identity());
+  auto result = registration.align(*target, *source, *target_tree, small_gicp::native_transform(Eigen::Isometry3d::Identity()));
 
-  std::cout << "--- T_target_source ---" << std::endl << result.T_target_source.matrix() << std::endl;
+  std::cout << "--- T_target_source ---" << std::endl << small_gicp::eigen_transform(result.T_target_source).matrix() << std::endl;
   std::cout << "converged:" << result.converged << std::endl;
   std::cout << "error:" << result.error << std::endl;
   std::cout << "iterations:" << result.iterations << std::endl;
@@ -76,9 +76,9 @@ void example2(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& raw_target, const 
   std::cout << "--- b ---" << std::endl << small_gicp::eigen_view(result.b).transpose() << std::endl;
 
   // Because this usage exposes all preprocessed data, you can easily re-use them to obtain the best efficiency.
-  auto result2 = registration.align(*source, *target, *source_tree, Eigen::Isometry3d::Identity());
+  auto result2 = registration.align(*source, *target, *source_tree, small_gicp::native_transform(Eigen::Isometry3d::Identity()));
 
-  std::cout << "--- T_target_source ---" << std::endl << result2.T_target_source.inverse().matrix() << std::endl;
+  std::cout << "--- T_target_source ---" << std::endl << small_gicp::eigen_transform(result2.T_target_source).inverse().matrix() << std::endl;
 }
 
 int main(int argc, char** argv) {

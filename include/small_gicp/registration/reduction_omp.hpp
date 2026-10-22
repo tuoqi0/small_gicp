@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <Eigen/Geometry>
+#include <small_gicp/util/lie.hpp>
 #include <cstdint>
 #include <tuple>
 #include <vector>
@@ -35,7 +35,7 @@ struct ParallelReductionOMP {
     const SourcePointCloud& source,
     const TargetTree& target_tree,
     const CorrespondenceRejector& rejector,
-    const Eigen::Isometry3d& T,
+    const Transform& T,
     std::vector<Factor>& factors) const {
     using earth::mantle::collection::Matrix;
     using earth::mantle::math::operator+;
@@ -69,7 +69,7 @@ struct ParallelReductionOMP {
   }
 
   template <typename TargetPointCloud, typename SourcePointCloud, typename Factor>
-  double error(const TargetPointCloud& target, const SourcePointCloud& source, const Eigen::Isometry3d& T, std::vector<Factor>& factors) const {
+  double error(const TargetPointCloud& target, const SourcePointCloud& source, const Transform& T, std::vector<Factor>& factors) const {
     double sum_e = 0.0;
 
 #pragma omp parallel for num_threads(num_threads) schedule(guided, 8) reduction(+ : sum_e)

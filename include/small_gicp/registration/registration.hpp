@@ -30,7 +30,7 @@ public:
   /// @return             Registration result
   template <typename TargetPointCloud, typename SourcePointCloud, typename TargetTree>
   RegistrationResult
-  align(const TargetPointCloud& target, const SourcePointCloud& source, const TargetTree& target_tree, const Eigen::Isometry3d& init_T = Eigen::Isometry3d::Identity()) const {
+  align(const TargetPointCloud& target, const SourcePointCloud& source, const TargetTree& target_tree, const Transform& init_T = earth::mantle::math::identityMatrix<double, 4>()) const {
     if (traits::size(target) <= 10) {
       std::cerr << "warning: target point cloud is too small. |target|=" << traits::size(target) << std::endl;
     }

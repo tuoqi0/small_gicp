@@ -48,9 +48,9 @@ void example1(const std::vector<Eigen::Vector4f>& target_points, const std::vect
 
   // Align point clouds
   Eigen::Isometry3d init_T_target_source = Eigen::Isometry3d::Identity();
-  auto result = registration.align(*target, *source, *target_tree, init_T_target_source);
+  auto result = registration.align(*target, *source, *target_tree, small_gicp::native_transform(init_T_target_source));
 
-  std::cout << "--- T_target_source ---" << std::endl << result.T_target_source.matrix() << std::endl;
+  std::cout << "--- T_target_source ---" << std::endl << small_gicp::eigen_transform(result.T_target_source).matrix() << std::endl;
   std::cout << "converged:" << result.converged << std::endl;
   std::cout << "error:" << result.error << std::endl;
   std::cout << "iterations:" << result.iterations << std::endl;
@@ -165,8 +165,9 @@ struct Traits<MyNearestNeighborSearch> {
   /// @param k_indices   [out] Indices of the k-nearest neighbors
   /// @param k_sq_dists  [out] Squared distances of the k-nearest neighbors
   /// @return            Number of neighbors found
-  static size_t knn_search(const MyNearestNeighborSearch& search, const Eigen::Vector4d& point, size_t k, size_t* k_indices, double* k_sq_dists) {
-    return search.knn_search(point, k, k_indices, k_sq_dists);
+  template <typename Query>
+  static size_t knn_search(const MyNearestNeighborSearch& search, const Query& point, size_t k, size_t* k_indices, double* k_sq_dists) {
+    return search.knn_search(Eigen::Vector4d(point[0], point[1], point[2], point[3]), k, k_indices, k_sq_dists);
   }
 
   /// @brief Find the nearest neighbor. This is a special case of knn_search with k=1 and is used in point cloud registration.
@@ -192,7 +193,7 @@ struct MyCorrespondenceRejector {
   /// @param source_index   Source point index
   /// @param sq_dist        Squared distance between the points
   /// @return               True if the correspondence should be rejected
-  bool operator()(const MyPointCloud& target, const MyPointCloud& source, const Eigen::Isometry3d& T, size_t target_index, size_t source_index, double sq_dist) const {
+  bool operator()(const MyPointCloud& target, const MyPointCloud& source, const small_gicp::Transform& T, size_t target_index, size_t source_index, double sq_dist) const {
     // Reject correspondences with large distances
     if (sq_dist > max_correpondence_dist_sq) {
       return true;
@@ -231,7 +232,7 @@ struct MyGeneralFactor {
     const TargetPointCloud& target,
     const SourcePointCloud& source,
     const TargetTree& target_tree,
-    const Eigen::Isometry3d& T,
+    const small_gicp::Transform& T,
     small_gicp::factor_detail::Hessian* H,
     small_gicp::factor_detail::Gradient* b,
     double* e) const {
@@ -250,7 +251,7 @@ struct MyGeneralFactor {
   /// @param T        Evaluation point
   /// @param e        [in/out] Error at the evaluation point.
   template <typename TargetPointCloud, typename SourcePointCloud>
-  void update_error(const TargetPointCloud& target, const SourcePointCloud& source, const Eigen::Isometry3d& T, double* e) const {
+  void update_error(const TargetPointCloud& target, const SourcePointCloud& source, const small_gicp::Transform& T, double* e) const {
     // No update is required for the error.
   }
 
@@ -313,9 +314,9 @@ void example2(const std::vector<Eigen::Vector4f>& target_points, const std::vect
   // Align point clouds
   // Again, you can use your custom nearest neighbor search here!
   Eigen::Isometry3d init_T_target_source = Eigen::Isometry3d::Identity();
-  auto result = registration.align(*target, *source, *target_search, init_T_target_source);
+  auto result = registration.align(*target, *source, *target_search, small_gicp::native_transform(init_T_target_source));
 
-  std::cout << "--- T_target_source ---" << std::endl << result.T_target_source.matrix() << std::endl;
+  std::cout << "--- T_target_source ---" << std::endl << small_gicp::eigen_transform(result.T_target_source).matrix() << std::endl;
   std::cout << "converged:" << result.converged << std::endl;
   std::cout << "error:" << result.error << std::endl;
   std::cout << "iterations:" << result.iterations << std::endl;

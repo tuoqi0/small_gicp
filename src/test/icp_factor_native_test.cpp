@@ -16,14 +16,16 @@ struct Reject {
   template <typename... Args> bool operator()(const Args&...) const { return true; }
 };
 struct MissingNeighbor {
-  size_t nearest_neighbor_search(const Eigen::Vector4d&, size_t*, double*) const { return 0; }
+  template <typename Query>
+  size_t nearest_neighbor_search(const Query&, size_t*, double*) const { return 0; }
 };
 }
 
 namespace small_gicp { namespace traits {
 template <> struct Traits<MissingNeighbor> {
+  template <typename Query>
   static size_t nearest_neighbor_search(const MissingNeighbor& tree,
-      const Eigen::Vector4d& point, size_t* index, double* distance) {
+      const Query& point, size_t* index, double* distance) {
     return tree.nearest_neighbor_search(point, index, distance);
   }
 };
@@ -42,20 +44,20 @@ void checkRejectedCorrespondences() {
   small_gicp::factor_detail::Gradient native_gradient{};
   auto gradient = small_gicp::eigen_view(native_gradient);
   double error = 0;
-  REQUIRE(factor.linearize(target, source, tree, Eigen::Isometry3d::Identity(), 0,
+  REQUIRE(factor.linearize(target, source, tree, small_gicp::native_transform(Eigen::Isometry3d::Identity()), 0,
       Accept{}, &native_hessian, &native_gradient, &error));
   REQUIRE(factor.inlier());
   hessian.setConstant(7);
   gradient.setConstant(8);
   error = 9;
-  CHECK_FALSE(factor.linearize(target, source, tree, Eigen::Isometry3d::Identity(), 0,
+  CHECK_FALSE(factor.linearize(target, source, tree, small_gicp::native_transform(Eigen::Isometry3d::Identity()), 0,
       Reject{}, &native_hessian, &native_gradient, &error));
   CHECK_FALSE(factor.inlier());
-  CHECK(factor.error(target, source, Eigen::Isometry3d::Identity()) == 0);
+  CHECK(factor.error(target, source, small_gicp::native_transform(Eigen::Isometry3d::Identity())) == 0);
   CHECK((hessian.array() == 7).all());
   CHECK((gradient.array() == 8).all());
   CHECK(error == 9);
-  CHECK_FALSE(factor.linearize(target, source, MissingNeighbor{}, Eigen::Isometry3d::Identity(), 0,
+  CHECK_FALSE(factor.linearize(target, source, MissingNeighbor{}, small_gicp::native_transform(Eigen::Isometry3d::Identity()), 0,
       Accept{}, &native_hessian, &native_gradient, &error));
   CHECK_FALSE(factor.inlier());
   CHECK((hessian.array() == 7).all());
@@ -85,8 +87,8 @@ void checkPoseRecovery() {
   const auto result = registration.align(target, source, tree);
   REQUIRE(result.converged);
   CHECK(result.num_inliers == source.size());
-  CHECK((result.T_target_source.translation() - offset).norm() < 1e-3);
-  CHECK((result.T_target_source.linear() - Eigen::Matrix3d::Identity()).norm() < 1e-3);
+  CHECK((small_gicp::eigen_transform(result.T_target_source).translation() - offset).norm() < 1e-3);
+  CHECK((small_gicp::eigen_transform(result.T_target_source).linear() - Eigen::Matrix3d::Identity()).norm() < 1e-3);
 }
 }
 
@@ -109,7 +111,7 @@ TEST_CASE("native ICP equations and trial-pose error match original Eigen formul
     small_gicp::factor_detail::Gradient native_gradient{};
     auto gradient = small_gicp::eigen_view(native_gradient);
     double error = 0;
-    REQUIRE(factor.linearize(target, source, tree, transform, 0, Accept{}, &native_hessian, &native_gradient, &error));
+    REQUIRE(factor.linearize(target, source, tree, small_gicp::native_transform(transform), 0, Accept{}, &native_hessian, &native_gradient, &error));
     const Eigen::Vector4d residual = target.point(0) - transform * source.point(0);
     Eigen::Matrix<double, 4, 6> jacobian = Eigen::Matrix<double, 4, 6>::Zero();
     jacobian.topLeftCorner<3, 3>() = transform.linear() * small_gicp::skew(point);
@@ -120,7 +122,7 @@ TEST_CASE("native ICP equations and trial-pose error match original Eigen formul
     auto trial = transform;
     trial.translation() += Eigen::Vector3d(0.3, -0.1, 0.2);
     const Eigen::Vector4d trial_residual = target.point(0) - trial * source.point(0);
-    CHECK(factor.error(target, source, trial) == doctest::Approx(0.5 * trial_residual.squaredNorm()).epsilon(1e-12));
+    CHECK(factor.error(target, source, small_gicp::native_transform(trial)) == doctest::Approx(0.5 * trial_residual.squaredNorm()).epsilon(1e-12));
   }
 }
 
@@ -144,7 +146,7 @@ TEST_CASE("native normal-weighted ICP preserves componentwise not scalar plane e
     small_gicp::factor_detail::Gradient native_gradient{};
     auto gradient = small_gicp::eigen_view(native_gradient);
     double error = 0;
-    REQUIRE(factor.linearize(target, source, tree, transform, 0, Accept{}, &native_hessian, &native_gradient, &error));
+    REQUIRE(factor.linearize(target, source, tree, small_gicp::native_transform(transform), 0, Accept{}, &native_hessian, &native_gradient, &error));
     const Eigen::Vector4d normal = target.normal(0);
     const Eigen::Vector4d residual = target.point(0) - transform * source.point(0);
     const Eigen::Vector4d weighted = normal.array() * residual.array();
@@ -159,7 +161,7 @@ TEST_CASE("native normal-weighted ICP preserves componentwise not scalar plane e
     trial.translation() += Eigen::Vector3d(0.3, -0.1, 0.2);
     const Eigen::Vector4d trial_residual = target.point(0) - trial * source.point(0);
     const Eigen::Vector4d trial_weighted = normal.array() * trial_residual.array();
-    CHECK(factor.error(target, source, trial) == doctest::Approx(0.5 * trial_weighted.squaredNorm()).epsilon(1e-12));
+    CHECK(factor.error(target, source, small_gicp::native_transform(trial)) == doctest::Approx(0.5 * trial_weighted.squaredNorm()).epsilon(1e-12));
   }
 }
 
@@ -184,11 +186,11 @@ TEST_CASE("native normal-weighted ICP retains zero-normal behavior") {
   small_gicp::factor_detail::Gradient native_gradient{};
   auto gradient = small_gicp::eigen_view(native_gradient);
   double error = -1;
-  REQUIRE(factor.linearize(target, source, tree, Eigen::Isometry3d::Identity(), 0,
+  REQUIRE(factor.linearize(target, source, tree, small_gicp::native_transform(Eigen::Isometry3d::Identity()), 0,
       Accept{}, &native_hessian, &native_gradient, &error));
   CHECK(factor.inlier());
   CHECK(hessian.isZero());
   CHECK(gradient.isZero());
   CHECK(error == 0);
-  CHECK(factor.error(target, source, Eigen::Isometry3d::Identity()) == 0);
+  CHECK(factor.error(target, source, small_gicp::native_transform(Eigen::Isometry3d::Identity())) == 0);
 }

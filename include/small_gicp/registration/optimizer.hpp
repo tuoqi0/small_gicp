@@ -30,7 +30,7 @@ struct GaussNewtonOptimizer {
     const CorrespondenceRejector& rejector,
     const TerminationCriteria& criteria,
     Reduction& reduction,
-    const Eigen::Isometry3d& init_T,
+    const Transform& init_T,
     std::vector<Factor>& factors,
     GeneralFactor& general_factor) const {
     //
@@ -38,6 +38,7 @@ struct GaussNewtonOptimizer {
       std::cout << "--- GN optimization ---" << std::endl;
     }
 
+    using earth::mantle::math::operator*;
     RegistrationResult result(init_T);
     for (int i = 0; i < max_iterations && !result.converged; i++) {
       // Linearize
@@ -96,7 +97,7 @@ struct LevenbergMarquardtOptimizer {
     const CorrespondenceRejector& rejector,
     const TerminationCriteria& criteria,
     Reduction& reduction,
-    const Eigen::Isometry3d& init_T,
+    const Transform& init_T,
     std::vector<Factor>& factors,
     GeneralFactor& general_factor) const {
     //
@@ -105,6 +106,7 @@ struct LevenbergMarquardtOptimizer {
     }
 
     double lambda = init_lambda;
+    using earth::mantle::math::operator*;
     RegistrationResult result(init_T);
     for (int i = 0; i < max_iterations && !result.converged; i++) {
       // Linearize
@@ -122,7 +124,7 @@ struct LevenbergMarquardtOptimizer {
         }
 
         // Validate new solution
-        const Eigen::Isometry3d new_T = result.T_target_source * se3_exp(delta);
+        const Transform new_T = result.T_target_source * se3_exp(delta);
         double new_e = reduction.error(target, source, new_T, factors);
         general_factor.update_error(target, source, new_T, &e);
 

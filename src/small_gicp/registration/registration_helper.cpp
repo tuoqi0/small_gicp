@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 #include <small_gicp/registration/registration_helper.hpp>
+#include <small_gicp/util/eigen.hpp>
 
 #include <small_gicp/ann/kdtree.hpp>
 #include <small_gicp/ann/kdtree_omp.hpp>
@@ -92,7 +93,7 @@ align(const PointCloud& target, const PointCloud& source, const KdTree<PointClou
       registration.criteria.translation_eps = setting.translation_eps;
       registration.optimizer.max_iterations = setting.max_iterations;
       registration.optimizer.verbose = setting.verbose;
-      return registration.align(target, source, target_tree, init_T);
+      return registration.align(target, source, target_tree, native_transform(init_T));
     }
     case RegistrationSetting::PLANE_ICP: {
       Registration<PointToPlaneICPFactor, ParallelReductionOMP> registration;
@@ -102,7 +103,7 @@ align(const PointCloud& target, const PointCloud& source, const KdTree<PointClou
       registration.criteria.translation_eps = setting.translation_eps;
       registration.optimizer.max_iterations = setting.max_iterations;
       registration.optimizer.verbose = setting.verbose;
-      return registration.align(target, source, target_tree, init_T);
+      return registration.align(target, source, target_tree, native_transform(init_T));
     }
     case RegistrationSetting::GICP: {
       Registration<GICPFactor, ParallelReductionOMP> registration;
@@ -112,11 +113,11 @@ align(const PointCloud& target, const PointCloud& source, const KdTree<PointClou
       registration.criteria.translation_eps = setting.translation_eps;
       registration.optimizer.max_iterations = setting.max_iterations;
       registration.optimizer.verbose = setting.verbose;
-      return registration.align(target, source, target_tree, init_T);
+      return registration.align(target, source, target_tree, native_transform(init_T));
     }
     case RegistrationSetting::VGICP: {
       std::cerr << "error: use align(const GaussianVoxelMap&, const GaussianVoxelMap&, const Eigen::Isometry3d&, const RegistrationSetting&) for VGICP" << std::endl;
-      return RegistrationResult(Eigen::Isometry3d::Identity());
+      return RegistrationResult{};
     }
   }
 }
@@ -133,7 +134,7 @@ RegistrationResult align(const GaussianVoxelMap& target, const PointCloud& sourc
   registration.criteria.translation_eps = setting.translation_eps;
   registration.optimizer.max_iterations = setting.max_iterations;
   registration.optimizer.verbose = setting.verbose;
-  return registration.align(target, source, target, init_T);
+  return registration.align(target, source, target, native_transform(init_T));
 }
 
 }  // namespace small_gicp

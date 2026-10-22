@@ -3,7 +3,7 @@
 #pragma once
 
 #include <tbb/tbb.h>
-#include <Eigen/Geometry>
+#include <small_gicp/util/lie.hpp>
 #include <tuple>
 #include <vector>
 #include <small_gicp/factors/linearization.hpp>
@@ -18,7 +18,7 @@ struct LinearizeSum {
     const SourcePointCloud& source,
     const TargetTree& target_tree,
     const CorrespondenceRejector& rejector,
-    const Eigen::Isometry3d& T,
+    const Transform& T,
     std::vector<Factor>& factors)
   : target(target),
     source(source),
@@ -77,7 +77,7 @@ struct LinearizeSum {
   const SourcePointCloud& source;
   const TargetTree& target_tree;
   const CorrespondenceRejector& rejector;
-  const Eigen::Isometry3d& T;
+  const Transform& T;
   std::vector<Factor>& factors;
 
   factor_detail::Hessian H;
@@ -88,7 +88,7 @@ struct LinearizeSum {
 /// @brief Summation for evaluated errors
 template <typename TargetPointCloud, typename SourcePointCloud, typename Factor>
 struct ErrorSum {
-  ErrorSum(const TargetPointCloud& target, const SourcePointCloud& source, const Eigen::Isometry3d& T, std::vector<Factor>& factors)
+  ErrorSum(const TargetPointCloud& target, const SourcePointCloud& source, const Transform& T, std::vector<Factor>& factors)
   : target(target),
     source(source),
     T(T),
@@ -109,7 +109,7 @@ struct ErrorSum {
 
   const TargetPointCloud& target;
   const SourcePointCloud& source;
-  const Eigen::Isometry3d& T;
+  const Transform& T;
   std::vector<Factor>& factors;
 
   double e;
@@ -125,7 +125,7 @@ struct ParallelReductionTBB {
     const SourcePointCloud& source,
     const TargetTree& target_tree,
     const CorrespondenceRejector& rejector,
-    const Eigen::Isometry3d& T,
+    const Transform& T,
     std::vector<Factor>& factors) const {
     //
     LinearizeSum<TargetPointCloud, SourcePointCloud, TargetTree, CorrespondenceRejector, Factor> sum(target, source, target_tree, rejector, T, factors);
@@ -136,7 +136,7 @@ struct ParallelReductionTBB {
   }
 
   template <typename TargetPointCloud, typename SourcePointCloud, typename Factor>
-  double error(const TargetPointCloud& target, const SourcePointCloud& source, const Eigen::Isometry3d& T, std::vector<Factor>& factors) const {
+  double error(const TargetPointCloud& target, const SourcePointCloud& source, const Transform& T, std::vector<Factor>& factors) const {
     ErrorSum<TargetPointCloud, SourcePointCloud, Factor> sum(target, source, T, factors);
     tbb::parallel_reduce(tbb::blocked_range<size_t>(0, factors.size(), 16), sum);
     return sum.e;

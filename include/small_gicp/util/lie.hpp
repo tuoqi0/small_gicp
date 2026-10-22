@@ -2,26 +2,13 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+#include <math/fixed_matrix_ops.h>
 #include <math/se3_exp.h>
-#include <collection/fixed_matrix.h>
 
 namespace small_gicp {
 
-/// @brief Create skew symmetric matrix
-/// @param x  Rotation vector
-/// @return   Skew symmetric matrix
-inline Eigen::Matrix3d skew(const Eigen::Vector3d& x) {
-  Eigen::Matrix3d skew = Eigen::Matrix3d::Zero();
-  skew(0, 1) = -x[2];
-  skew(0, 2) = x[1];
-  skew(1, 0) = x[2];
-  skew(1, 2) = -x[0];
-  skew(2, 0) = -x[1];
-  skew(2, 1) = x[0];
-  return skew;
-}
+// Homogeneous source-to-target transform. Storage and products use Mantle.
+using Transform = earth::mantle::collection::Matrix<double, 4, 4>;
 
 /*
  * SO3 expmap code taken from Sophus
@@ -49,35 +36,23 @@ inline Eigen::Matrix3d skew(const Eigen::Vector3d& x) {
  * IN THE SOFTWARE.
  */
 
-/// @brief SO3 expmap.
-/// @param omega  [rx, ry, rz]
-/// @return       Quaternion
-inline Eigen::Quaterniond so3_exp(const Eigen::Vector3d& omega) {
-  const auto q = earth::mantle::math::so3Exp({{omega[0], omega[1], omega[2]}});
-  // Mantle stores x/y/z/w; Eigen's constructor takes w/x/y/z.
-  return Eigen::Quaterniond(q[3], q[0], q[1], q[2]);
+/// @brief SE3 exponential, rotation-first increment [rx, ry, rz, tx, ty, tz].
+inline Transform se3_exp(const earth::mantle::collection::Matrix<double, 6, 1>& delta) {
+  const auto pose = earth::mantle::math::se3Exp({{delta[0][0], delta[1][0], delta[2][0],
+      delta[3][0], delta[4][0], delta[5][0]}});
+  auto transform = earth::mantle::math::identityMatrix<double, 4>();
+  for (size_t row = 0; row < 3; ++row) {
+    for (size_t col = 0; col < 3; ++col) transform[row][col] = pose.rotation[row * 3 + col];
+    transform[row][3] = pose.translation[row];
+  }
+  return transform;
 }
 
-// Rotation-first
-/// @brief SE3 expmap (Rotation-first).
-/// @param a  Twist vector [rx, ry, rz, tx, ty, tz]
-/// @return   SE3 matrix
-inline Eigen::Isometry3d se3_exp(const Eigen::Matrix<double, 6, 1>& a) {
-  const auto native = earth::mantle::math::se3Exp({{a[0], a[1], a[2], a[3], a[4], a[5]}});
-  Eigen::Isometry3d result = Eigen::Isometry3d::Identity();
-  result.linear() = Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(
-      native.rotation.data());
-  result.translation() = Eigen::Map<const Eigen::Vector3d>(native.translation.data());
-  return result;
-}
-
-// Temporary Eigen pose boundary; the optimizer increment remains native.
-inline Eigen::Isometry3d se3_exp(const earth::mantle::collection::Matrix<double, 6, 1>& a) {
-  const auto native = earth::mantle::math::se3Exp({{a[0][0], a[1][0], a[2][0], a[3][0], a[4][0], a[5][0]}});
-  Eigen::Isometry3d result = Eigen::Isometry3d::Identity();
-  result.linear() = Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(native.rotation.data());
-  result.translation() = Eigen::Map<const Eigen::Vector3d>(native.translation.data());
-  return result;
+inline earth::mantle::collection::Matrix<double, 3, 3> rotation_matrix(const Transform& transform) {
+  earth::mantle::collection::Matrix<double, 3, 3> rotation{};
+  for (size_t row = 0; row < 3; ++row)
+    for (size_t col = 0; col < 3; ++col) rotation[row][col] = transform[row][col];
+  return rotation;
 }
 
 }  // namespace small_gicp

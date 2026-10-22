@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 #ifdef BUILD_WITH_TBB
 #include <vector>
 
@@ -91,8 +92,8 @@ public:
       registration.rejector.max_dist_sq = params.max_correspondence_distance * params.max_correspondence_distance;
 
       // Align points
-      const auto result = registration.align(*pair.target->points, *pair.source->points, *pair.target->kdtree, Eigen::Isometry3d::Identity());
-      pair.source->T_last_current = result.T_target_source;
+      const auto result = registration.align(*pair.target->points, *pair.source->points, *pair.target->kdtree, small_gicp::native_transform(Eigen::Isometry3d::Identity()));
+      pair.source->T_last_current = small_gicp::eigen_transform(result.T_target_source);
       return pair.source;
     });
 

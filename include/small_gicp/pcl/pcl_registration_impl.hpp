@@ -224,7 +224,7 @@ void RegistrationPCL<PointSource, PointTarget>::computeTransformation(PointCloud
   registration.optimizer.max_iterations = max_iterations_;
 
   if (registration_type_ == "GICP") {
-    result_ = registration.align(target_proxy, source_proxy, *target_tree_, Eigen::Isometry3d(guess.template cast<double>()));
+    result_ = registration.align(target_proxy, source_proxy, *target_tree_, native_transform(Eigen::Isometry3d(guess.template cast<double>())));
   } else if (registration_type_ == "VGICP") {
     if (!target_voxelmap_) {
       target_voxelmap_ = std::make_shared<GaussianVoxelMap>(voxel_resolution_);
@@ -235,14 +235,14 @@ void RegistrationPCL<PointSource, PointTarget>::computeTransformation(PointCloud
       source_voxelmap_->insert(source_proxy);
     }
 
-    result_ = registration.align(*target_voxelmap_, source_proxy, *target_voxelmap_, Eigen::Isometry3d(guess.template cast<double>()));
+    result_ = registration.align(*target_voxelmap_, source_proxy, *target_voxelmap_, native_transform(Eigen::Isometry3d(guess.template cast<double>())));
   } else {
     PCL_ERROR("[RegistrationPCL::computeTransformation] Invalid registration type: %s\n", registration_type_.c_str());
     return;
   }
 
   converged_ = result_.converged;
-  final_transformation_ = result_.T_target_source.matrix().template cast<float>();
+  final_transformation_ = eigen_view(result_.T_target_source).template cast<float>();
   pcl::transformPointCloud(*input_, output, final_transformation_);
 }
 

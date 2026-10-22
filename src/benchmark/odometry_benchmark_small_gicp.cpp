@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 #include <small_gicp/benchmark/benchmark_odom.hpp>
 
 #include <small_gicp/factors/gicp_factor.hpp>
@@ -29,12 +30,12 @@ public:
     Registration<GICPFactor, SerialReduction> registration;
     registration.rejector.max_dist_sq = params.max_correspondence_distance * params.max_correspondence_distance;
 
-    auto result = registration.align(*target_points, *points, *target_tree, Eigen::Isometry3d::Identity());
+    auto result = registration.align(*target_points, *points, *target_tree, small_gicp::native_transform(Eigen::Isometry3d::Identity()));
 
     sw.stop();
     reg_times.push(sw.msec());
 
-    T = T * result.T_target_source;
+    T = T * small_gicp::eigen_transform(result.T_target_source);
     target_points = points;
     target_tree = tree;
 

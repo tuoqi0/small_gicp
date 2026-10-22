@@ -230,12 +230,14 @@ struct Traits<IncrementalVoxelMap<VoxelContents>> {
     return traits::cov(voxel, point_id);
   }
 
-  static size_t nearest_neighbor_search(const IncrementalVoxelMap<VoxelContents>& voxelmap, const Eigen::Vector4d& pt, size_t* k_index, double* k_sq_dist) {
-    return voxelmap.nearest_neighbor_search(pt, k_index, k_sq_dist);
+  template <typename Query>
+  static size_t nearest_neighbor_search(const IncrementalVoxelMap<VoxelContents>& voxelmap, const Query& pt, size_t* k_index, double* k_sq_dist) {
+    return voxelmap.nearest_neighbor_search(Eigen::Vector4d(pt[0], pt[1], pt[2], pt[3]), k_index, k_sq_dist);
   }
 
-  static size_t knn_search(const IncrementalVoxelMap<VoxelContents>& voxelmap, const Eigen::Vector4d& pt, int k, size_t* k_index, double* k_sq_dist) {
-    return voxelmap.knn_search(pt, k, k_index, k_sq_dist);
+  template <typename Query>
+  static size_t knn_search(const IncrementalVoxelMap<VoxelContents>& voxelmap, const Query& pt, int k, size_t* k_index, double* k_sq_dist) {
+    return voxelmap.knn_search(Eigen::Vector4d(pt[0], pt[1], pt[2], pt[3]), k, k_index, k_sq_dist);
   }
 };
 

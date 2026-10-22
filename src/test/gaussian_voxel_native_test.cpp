@@ -140,10 +140,10 @@ TEST_CASE("native Gaussian map supports repeated insertion search and GICP linea
   small_gicp::factor_detail::Gradient native_gradient{};
   auto gradient = small_gicp::eigen_view(native_gradient);
   double error = 0;
-  REQUIRE(factor.linearize(map, cloud, map, Eigen::Isometry3d::Identity(), 0,
+  REQUIRE(factor.linearize(map, cloud, map, small_gicp::native_transform(Eigen::Isometry3d::Identity()), 0,
       AcceptCorrespondence{}, &native_hessian, &native_gradient, &error));
   CHECK(error == doctest::Approx(0.0025));
-  CHECK(factor.error(map, cloud, Eigen::Isometry3d::Identity()) == doctest::Approx(error));
+  CHECK(factor.error(map, cloud, small_gicp::native_transform(Eigen::Isometry3d::Identity())) == doctest::Approx(error));
 }
 
 TEST_CASE("native Gaussian map registration recovers a rigid pose") {
@@ -172,12 +172,12 @@ TEST_CASE("native Gaussian map registration recovers a rigid pose") {
   registration.optimizer.max_iterations = 50;
   const auto result = registration.align(map, source, map);
   INFO("inliers=", result.num_inliers, ", source=", source.size(),
-       ", translation=", result.T_target_source.translation().transpose(),
+       ", translation=", small_gicp::eigen_transform(result.T_target_source).translation().transpose(),
        ", expected=", expected.translation().transpose());
   REQUIRE(result.converged);
   CHECK(result.num_inliers == source.size());
-  CHECK((result.T_target_source.translation() - expected.translation()).norm() < 1e-3);
-  CHECK((result.T_target_source.linear() - expected.linear()).norm() < 1e-3);
+  CHECK((small_gicp::eigen_transform(result.T_target_source).translation() - expected.translation()).norm() < 1e-3);
+  CHECK((small_gicp::eigen_transform(result.T_target_source).linear() - expected.linear()).norm() < 1e-3);
 }
 
 TEST_CASE("Gaussian map retains center-cell-only search by default") {

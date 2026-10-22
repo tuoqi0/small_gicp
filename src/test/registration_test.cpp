@@ -1,3 +1,4 @@
+#include <small_gicp/util/eigen.hpp>
 #include <robot_core/test/doctest.h>
 #include <string>
 #include <cmath>
@@ -103,22 +104,22 @@ public:
   template <typename Registration>
   void test_registration(Registration& registration) {
     for (int i = 0; i < T_noise.size(); i++) {
-      auto result = registration.align(*target, *source, *target_tree, T_noise[i]);
-      CHECK_MESSAGE((compare_transformation(T_target_source, result.T_target_source)), ("Forward transformation T_noise="), (i));
+      auto result = registration.align(*target, *source, *target_tree, small_gicp::native_transform(T_noise[i]));
+      CHECK_MESSAGE((compare_transformation(T_target_source, small_gicp::eigen_transform(result.T_target_source))), ("Forward transformation T_noise="), (i));
 
-      result = registration.align(*target_pcl, *source_pcl, *target_tree, T_noise[i]);
-      CHECK_MESSAGE((compare_transformation(T_target_source, result.T_target_source)), ("Forward transformation (pcl) T_noise="), (i));
+      result = registration.align(*target_pcl, *source_pcl, *target_tree, small_gicp::native_transform(T_noise[i]));
+      CHECK_MESSAGE((compare_transformation(T_target_source, small_gicp::eigen_transform(result.T_target_source))), ("Forward transformation (pcl) T_noise="), (i));
 
-      result = registration.align(*source, *target, *source_tree, T_noise[i]);
-      CHECK_MESSAGE((compare_transformation(T_target_source.inverse(), result.T_target_source)), ("Inverse transformation T_noise="), (i));
+      result = registration.align(*source, *target, *source_tree, small_gicp::native_transform(T_noise[i]));
+      CHECK_MESSAGE((compare_transformation(T_target_source.inverse(), small_gicp::eigen_transform(result.T_target_source))), ("Inverse transformation T_noise="), (i));
 
-      result = registration.align(*source_pcl, *target_pcl, *source_tree, T_noise[i]);
-      CHECK_MESSAGE((compare_transformation(T_target_source.inverse(), result.T_target_source)), ("Inverse transformation (pcl) T_noise="), (i));
+      result = registration.align(*source_pcl, *target_pcl, *source_tree, small_gicp::native_transform(T_noise[i]));
+      CHECK_MESSAGE((compare_transformation(T_target_source.inverse(), small_gicp::eigen_transform(result.T_target_source))), ("Inverse transformation (pcl) T_noise="), (i));
 
       for (int j = 0; j < T_source_shifted.size(); j++) {
         const Eigen::Isometry3d T_target_shifted = T_target_source * T_source_shifted[j];
-        auto result = registration.align(*target, *shifted[j], *target_tree, T_source_shifted[j] * T_noise[i]);
-        CHECK_MESSAGE((compare_transformation(T_target_shifted, result.T_target_source)), ("Forward transformation T_source_shifted="), (j), (" T_noise="), (i));
+        auto result = registration.align(*target, *shifted[j], *target_tree, small_gicp::native_transform(T_source_shifted[j] * T_noise[i]));
+        CHECK_MESSAGE((compare_transformation(T_target_shifted, small_gicp::eigen_transform(result.T_target_source))), ("Forward transformation T_source_shifted="), (j), (" T_noise="), (i));
       }
     }
   }
@@ -126,16 +127,16 @@ public:
   template <typename Registration>
   void test_registration_vgicp(Registration& registration) {
     for (int i = 0; i < T_noise.size(); i++) {
-      auto result = registration.align(*target_voxelmap, *source, *target_voxelmap, T_noise[i]);
-      CHECK_MESSAGE((compare_transformation(T_target_source, result.T_target_source)), ("Forward transformation T_noise="), (i));
+      auto result = registration.align(*target_voxelmap, *source, *target_voxelmap, small_gicp::native_transform(T_noise[i]));
+      CHECK_MESSAGE((compare_transformation(T_target_source, small_gicp::eigen_transform(result.T_target_source))), ("Forward transformation T_noise="), (i));
 
-      result = registration.align(*source_voxelmap, *target, *source_voxelmap, T_noise[i]);
-      CHECK_MESSAGE((compare_transformation(T_target_source.inverse(), result.T_target_source)), ("Inverse transformation T_noise="), (i));
+      result = registration.align(*source_voxelmap, *target, *source_voxelmap, small_gicp::native_transform(T_noise[i]));
+      CHECK_MESSAGE((compare_transformation(T_target_source.inverse(), small_gicp::eigen_transform(result.T_target_source))), ("Inverse transformation T_noise="), (i));
 
       for (int j = 0; j < T_source_shifted.size(); j++) {
         const Eigen::Isometry3d T_target_shifted = T_target_source * T_source_shifted[j];
-        auto result = registration.align(*target_voxelmap, *shifted[j], *target_voxelmap, T_source_shifted[j] * T_noise[i]);
-        CHECK_MESSAGE((compare_transformation(T_target_shifted, result.T_target_source)), ("Forward transformation T_source_shifted="), (j), (" T_noise="), (i));
+        auto result = registration.align(*target_voxelmap, *shifted[j], *target_voxelmap, small_gicp::native_transform(T_source_shifted[j] * T_noise[i]));
+        CHECK_MESSAGE((compare_transformation(T_target_shifted, small_gicp::eigen_transform(result.T_target_source))), ("Forward transformation T_source_shifted="), (j), (" T_noise="), (i));
       }
     }
   }

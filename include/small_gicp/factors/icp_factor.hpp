@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+#include <small_gicp/util/lie.hpp>
 #include <limits>
 #include <math/fixed_matrix_ops.h>
 #include <small_gicp/factors/linearization.hpp>
@@ -23,7 +22,7 @@ struct ICPFactor {
     const TargetPointCloud& target,
     const SourcePointCloud& source,
     const TargetTree& target_tree,
-    const Eigen::Isometry3d& T,
+    const Transform& T,
     size_t source_index,
     const CorrespondenceRejector& rejector,
     factor_detail::Hessian* H,
@@ -36,13 +35,10 @@ struct ICPFactor {
     using earth::mantle::collection::Matrix;
     using earth::mantle::math::operator*;
     using earth::mantle::math::operator+;
-    using PackedTransform = Eigen::Matrix<double, 4, 4, Eigen::RowMajor>;
-    using PackedRotation = Eigen::Matrix<double, 3, 3, Eigen::RowMajor>;
-    const PackedTransform packed_transform = T.matrix();
-    const auto transform = Matrix<double, 4, 4>::from(packed_transform.data(), packed_transform.size());
-    const auto source_point = traits::point(source, source_index);
-    const auto transformed = transform * Matrix<double, 4, 1>::from(source_point.data(), source_point.size());
-    const Eigen::Map<const Eigen::Vector4d> transed_source_pt(transformed.raw_pointer());
+    const auto& transform = T;
+    const auto source_point = traits::point_matrix(source, source_index);
+    const auto transformed = transform * source_point;
+    const std::array<double, 4> transed_source_pt{{transformed[0][0], transformed[1][0], transformed[2][0], transformed[3][0]}};
 
     size_t k_index;
     double k_sq_dist;
@@ -51,20 +47,19 @@ struct ICPFactor {
     }
 
     target_index = k_index;
-    const auto target_point = traits::point(target, target_index);
-    const auto residual = Matrix<double, 4, 1>::from(target_point.data(), target_point.size()) + (-1.0) * transformed;
+    const auto target_point = traits::point_matrix(target, target_index);
+    const auto residual = target_point + (-1.0) * transformed;
 
-    const PackedRotation packed_rotation = T.linear();
-    const auto rotation = Matrix<double, 3, 3>::from(packed_rotation.data(), packed_rotation.size());
+    const auto rotation = rotation_matrix(T);
     const auto jacobian = factor_detail::pointJacobian(
-        Matrix<double, 4, 1>::from(source_point.data(), source_point.size()), rotation);
+        source_point, rotation);
     factor_detail::linearizeResidual(jacobian, residual, *H, *b, *e);
 
     return true;
   }
 
   template <typename TargetPointCloud, typename SourcePointCloud>
-  double error(const TargetPointCloud& target, const SourcePointCloud& source, const Eigen::Isometry3d& T) const {
+  double error(const TargetPointCloud& target, const SourcePointCloud& source, const Transform& T) const {
     if (target_index == std::numeric_limits<size_t>::max()) {
       return 0.0;
     }
@@ -72,13 +67,11 @@ struct ICPFactor {
     using earth::mantle::collection::Matrix;
     using earth::mantle::math::operator*;
     using earth::mantle::math::operator+;
-    using PackedTransform = Eigen::Matrix<double, 4, 4, Eigen::RowMajor>;
-    const PackedTransform packed_transform = T.matrix();
-    const auto transform = Matrix<double, 4, 4>::from(packed_transform.data(), packed_transform.size());
-    const auto source_point = traits::point(source, source_index);
-    const auto target_point = traits::point(target, target_index);
-    const auto residual = Matrix<double, 4, 1>::from(target_point.data(), target_point.size()) +
-        (-1.0) * (transform * Matrix<double, 4, 1>::from(source_point.data(), source_point.size()));
+    const auto& transform = T;
+    const auto source_point = traits::point_matrix(source, source_index);
+    const auto target_point = traits::point_matrix(target, target_index);
+    const auto residual = target_point +
+        (-1.0) * (transform * source_point);
     return factor_detail::squaredError(residual);
   }
 

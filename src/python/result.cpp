@@ -25,7 +25,7 @@ void define_result(py::module& m) {
         sst << "converted=" << result.converged << "\n";
         sst << "iterations=" << result.iterations << "\n";
         sst << "num_inliers=" << result.num_inliers << "\n";
-        sst << "T_target_source=\n" << result.T_target_source.matrix() << "\n";
+        sst << "T_target_source=\n" << small_gicp::eigen_transform(result.T_target_source).matrix() << "\n";
         sst << "H=\n" << eigen_view(result.H) << "\n";
         sst << "b=\n" << eigen_view(result.b).transpose() << "\n";
         sst << "error= " << result.error << "\n";
@@ -33,7 +33,7 @@ void define_result(py::module& m) {
       })
     .def_property_readonly(
       "T_target_source",
-      [](const RegistrationResult& result) -> Eigen::Matrix4d { return result.T_target_source.matrix(); },
+      [](const RegistrationResult& result) -> Eigen::Matrix4d { return small_gicp::eigen_transform(result.T_target_source).matrix(); },
       "NDArray[np.float64] : Final transformation matrix (4x4). This transformation brings a point in the source cloud frame to the target cloud frame.")
     .def_readonly("converged", &RegistrationResult::converged, "bool : Convergence flag")
     .def_readonly("iterations", &RegistrationResult::iterations, "int : Number of iterations")

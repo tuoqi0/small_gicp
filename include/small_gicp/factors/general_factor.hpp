@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+#include <small_gicp/util/lie.hpp>
 #include <array>
 #include <cmath>
 #include <small_gicp/factors/linearization.hpp>
@@ -27,7 +26,7 @@ struct NullFactor {
     const TargetPointCloud& target,
     const SourcePointCloud& source,
     const TargetTree& target_tree,
-    const Eigen::Isometry3d& T,
+    const Transform& T,
     factor_detail::Hessian* H,
     factor_detail::Gradient* b,
     double* e) const {}
@@ -38,7 +37,7 @@ struct NullFactor {
   /// @param T        Evaluation point
   /// @param e        [in/out] Error at the evaluation point.
   template <typename TargetPointCloud, typename SourcePointCloud>
-  void update_error(const TargetPointCloud& target, const SourcePointCloud& source, const Eigen::Isometry3d& T, double* e) const {}
+  void update_error(const TargetPointCloud& target, const SourcePointCloud& source, const Transform& T, double* e) const {}
 };
 
 /// @brief Factor to restrict the degrees of freedom of optimization (e.g., fixing roll, pitch rotation).
@@ -68,7 +67,7 @@ struct RestrictDoFFactor {
     const TargetPointCloud& target,
     const SourcePointCloud& source,
     const TargetTree& target_tree,
-    const Eigen::Isometry3d& T,
+    const Transform& T,
     factor_detail::Hessian* H,
     factor_detail::Gradient* b,
     double* e) const {
@@ -78,7 +77,7 @@ struct RestrictDoFFactor {
 
   /// @brief Update error consisting of per-point factors.
   template <typename TargetPointCloud, typename SourcePointCloud>
-  void update_error(const TargetPointCloud& target, const SourcePointCloud& source, const Eigen::Isometry3d& T, double* e) const {}
+  void update_error(const TargetPointCloud& target, const SourcePointCloud& source, const Transform& T, double* e) const {}
 
   double lambda;                    ///< Regularization parameter (Increasing this makes the constraint stronger)
   std::array<double, 6> mask;  ///< Mask for restricting DoF (rx, ry, rz, tx, ty, tz)

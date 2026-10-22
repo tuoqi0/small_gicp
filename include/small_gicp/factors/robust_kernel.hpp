@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <Eigen/Core>
-#include <Eigen/Geometry>
+#include <small_gicp/util/lie.hpp>
 #include <small_gicp/factors/linearization.hpp>
 
 namespace small_gicp {
@@ -72,7 +71,7 @@ public:
     const TargetPointCloud& target,
     const SourcePointCloud& source,
     const TargetTree& target_tree,
-    const Eigen::Isometry3d& T,
+    const Transform& T,
     size_t source_index,
     const CorrespondenceRejector& rejector,
     factor_detail::Hessian* H,
@@ -94,7 +93,7 @@ public:
 
   /// @brief Evaluate error
   template <typename TargetPointCloud, typename SourcePointCloud>
-  double error(const TargetPointCloud& target, const SourcePointCloud& source, const Eigen::Isometry3d& T) const {
+  double error(const TargetPointCloud& target, const SourcePointCloud& source, const Transform& T) const {
     const double e = factor.error(target, source, T);
     return robust_kernel.weight(std::sqrt(e)) * e;
   }
