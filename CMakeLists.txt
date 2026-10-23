@@ -15,7 +15,8 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 # Build options
 option(BUILD_HELPER "Build helper library" ON)
-option(BUILD_TESTS "Build tests" OFF)
+option(BUILD_TESTS "Build optional interop and numerical reference tests" OFF)
+option(BUILD_NATIVE_TESTS "Build native production contracts without interop" OFF)
 option(BUILD_EXAMPLES "Build examples" OFF)
 option(BUILD_BENCHMARKS "Build benchmarks" OFF)
 option(BUILD_PYTHON_BINDINGS "Build python bindings" OFF)
@@ -37,6 +38,10 @@ if(BUILD_TESTS OR BUILD_EXAMPLES)
   set(BUILD_HELPER ON CACHE BOOL "Helper library is required" FORCE)
   set(BUILD_WITH_TBB ON CACHE BOOL "TBB is required" FORCE)
   set(BUILD_WITH_PCL ON CACHE BOOL "PCL is required" FORCE)
+endif()
+
+if(BUILD_NATIVE_TESTS)
+  set(BUILD_HELPER ON CACHE BOOL "Native helper contracts require the helper library" FORCE)
 endif()
 
 # Math kernels are shared by interface; slam_math remains standalone.
@@ -263,6 +268,27 @@ endif()
 ##########
 ## Test ##
 ##########
+set(NATIVE_TEST_SOURCES
+  src/test/helper_native_test.cpp
+  src/test/linear_system_native_test.cpp
+  src/test/linearization_native_test.cpp
+  src/test/projection_native_test.cpp
+  src/test/registration_native_test.cpp)
+
+if(BUILD_NATIVE_TESTS)
+  find_package(robot_core CONFIG REQUIRED)
+  find_package(OpenMP REQUIRED COMPONENTS CXX)
+  include(${robot_core_DIR}/robot_coreTests.cmake)
+  enable_testing()
+  foreach(TEST_SOURCE IN LISTS NATIVE_TEST_SOURCES)
+    get_filename_component(TEST_NAME ${TEST_SOURCE} NAME_WE)
+    robot_core_add_test(${TEST_NAME} ${TEST_SOURCE})
+    target_link_libraries(${TEST_NAME} small_gicp OpenMP::OpenMP_CXX)
+    set_tests_properties(${TEST_NAME} PROPERTIES
+      ENVIRONMENT "OMP_NUM_THREADS=2;OMP_THREAD_LIMIT=2;LD_LIBRARY_PATH=$<TARGET_FILE_DIR:small_gicp>:$ENV{LD_LIBRARY_PATH}")
+  endforeach()
+endif()
+
 if(BUILD_TESTS)
   find_package(robot_core CONFIG REQUIRED)
   include(${robot_core_DIR}/robot_coreTests.cmake)
@@ -271,6 +297,10 @@ if(BUILD_TESTS)
   file(GLOB TEST_SOURCES "src/test/*.cpp")
   # Generate test target for each test source file
   foreach(TEST_SOURCE ${TEST_SOURCES})
+    file(RELATIVE_PATH RELATIVE_TEST_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}" "${TEST_SOURCE}")
+    if(BUILD_NATIVE_TESTS AND RELATIVE_TEST_SOURCE IN_LIST NATIVE_TEST_SOURCES)
+      continue()
+    endif()
     get_filename_component(TEST_NAME ${TEST_SOURCE} NAME_WE)
     robot_core_add_test(${TEST_NAME} ${TEST_SOURCE})
     small_gicp_use_interop(${TEST_NAME})
