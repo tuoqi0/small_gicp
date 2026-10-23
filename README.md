@@ -19,6 +19,24 @@ If you find this package useful for your project, please consider leaving a comm
 
 This library uses C++17 features. The PCL interface is not compatible with PCL older than 1.11 that uses `boost::shared_ptr`.
 
+## Installed native and optional interfaces
+
+The default `small_gicp::small_gicp` target exposes native headers only. The Eigen,
+PCL and benchmark headers keep their original include names in a separate installed
+include directory. Request and link the matching optional component explicitly:
+
+```cmake
+find_package(small_gicp CONFIG REQUIRED COMPONENTS eigen) # or pcl / benchmark
+target_link_libraries(my_reference PRIVATE small_gicp::eigen)
+```
+
+Use `small_gicp::pcl` for PCL adapters and `small_gicp::benchmark` for the benchmark
+headers. These components find their own Eigen/PCL/fmt dependencies; a native import
+does not find them. Source builds of optional examples, Python bindings, benchmarks
+and reference tests receive `interop/include` privately. Shell's corresponding ZX
+reference feature adds that path explicitly. Registration formulas and parameters
+are unchanged.
+
 ## Dependencies
 
 - [Mandatory] Installed `slam_math` / `robot_core` math packages. The nearest-neighbor implementation is bundled.

@@ -60,15 +60,9 @@ if (BUILD_WITH_TBB)
 endif()
 
 if (BUILD_WITH_PCL)
-  find_package(PCL REQUIRED)
+  # PCLConfig modifies directory include paths; keep its setup out of the core.
+  add_subdirectory(cmake/pcl_reference)
   add_compile_definitions(BUILD_WITH_PCL)
-  if (NOT TARGET PCL::PCL)
-    add_library(PCL::PCL INTERFACE IMPORTED)
-    set_target_properties(PCL::PCL PROPERTIES
-      INTERFACE_INCLUDE_DIRECTORIES "${PCL_INCLUDE_DIRS}"
-      INTERFACE_LINK_LIBRARIES "${PCL_LIBRARIES}"
-    )
-  endif()
 endif()
 
 if (BUILD_WITH_IRIDESCENCE)
@@ -134,6 +128,11 @@ if(BUILD_HELPER)
   )
 endif()
 
+# Explicit source-tree users of the optional Eigen/PCL and benchmark headers.
+function(small_gicp_use_interop target)
+  target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/interop/include)
+endfunction()
+
 # Python bindings
 if(BUILD_PYTHON_BINDINGS)
   find_package(Python COMPONENTS Interpreter Development)
@@ -163,6 +162,7 @@ if(BUILD_PYTHON_BINDINGS)
     slam_math::slam_math
     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
   )
+  small_gicp_use_interop(small_gicp_python)
   set_target_properties(small_gicp_python PROPERTIES OUTPUT_NAME small_gicp)
 endif()
 
@@ -189,6 +189,7 @@ if(BUILD_BENCHMARKS)
     src/benchmark/odometry_benchmark_small_gicp_tbb_flow.cpp
     src/benchmark/odometry_benchmark.cpp
   )
+  small_gicp_use_interop(odometry_benchmark)
   target_include_directories(odometry_benchmark PUBLIC
     ${FAST_GICP_INCLUDE_DIR}
   )
@@ -200,13 +201,14 @@ if(BUILD_BENCHMARKS)
     $<TARGET_NAME_IF_EXISTS:Iridescence::Iridescence>
     $<TARGET_NAME_IF_EXISTS:TBB::tbb>
     $<TARGET_NAME_IF_EXISTS:TBB::tbbmalloc>
-    $<TARGET_NAME_IF_EXISTS:PCL::PCL>
+    $<TARGET_NAME_IF_EXISTS:small_gicp_pcl_dependencies>
   )
 
   # KdTree construction benchmark
   add_executable(kdtree_benchmark
     src/benchmark/kdtree_benchmark.cpp
   )
+  small_gicp_use_interop(kdtree_benchmark)
   target_link_libraries(kdtree_benchmark PRIVATE
     fmt::fmt
     Eigen3::Eigen
@@ -220,6 +222,7 @@ if(BUILD_BENCHMARKS)
   add_executable(downsampling_benchmark
     src/benchmark/downsampling_benchmark.cpp
   )
+  small_gicp_use_interop(downsampling_benchmark)
   target_link_libraries(downsampling_benchmark PRIVATE
     fmt::fmt
     Eigen3::Eigen
@@ -227,7 +230,7 @@ if(BUILD_BENCHMARKS)
     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
     $<TARGET_NAME_IF_EXISTS:TBB::tbb>
     $<TARGET_NAME_IF_EXISTS:TBB::tbbmalloc>
-    $<TARGET_NAME_IF_EXISTS:PCL::PCL>
+    $<TARGET_NAME_IF_EXISTS:small_gicp_pcl_dependencies>
   )
 endif()
 
@@ -239,13 +242,14 @@ if(BUILD_EXAMPLES)
   foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
     get_filename_component(EXAMPLE_NAME ${EXAMPLE_SOURCE} NAME_WE)
     add_executable(${EXAMPLE_NAME} ${EXAMPLE_SOURCE})
+    small_gicp_use_interop(${EXAMPLE_NAME})
     target_link_libraries(${EXAMPLE_NAME} PRIVATE
       small_gicp
       Eigen3::Eigen
       fmt::fmt
       TBB::tbb
       TBB::tbbmalloc
-      PCL::PCL
+      small_gicp_pcl_dependencies
     )
    if(MSVC)
      set_target_properties(${EXAMPLE_NAME}
@@ -269,19 +273,20 @@ if(BUILD_TESTS)
   foreach(TEST_SOURCE ${TEST_SOURCES})
     get_filename_component(TEST_NAME ${TEST_SOURCE} NAME_WE)
     robot_core_add_test(${TEST_NAME} ${TEST_SOURCE})
+    small_gicp_use_interop(${TEST_NAME})
     target_link_libraries(${TEST_NAME}
       small_gicp
       Eigen3::Eigen
       fmt::fmt
       TBB::tbb
       TBB::tbbmalloc
-      PCL::PCL
+      small_gicp_pcl_dependencies
       OpenMP::OpenMP_CXX
     )
 
     set_tests_properties(${TEST_NAME} PROPERTIES
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      ENVIRONMENT "OMP_NUM_THREADS=2")
+      ENVIRONMENT "OMP_NUM_THREADS=2;LD_LIBRARY_PATH=$<TARGET_FILE_DIR:small_gicp>:$ENV{LD_LIBRARY_PATH}")
 
    if(MSVC)
      set_target_properties(${TEST_NAME}
@@ -298,6 +303,8 @@ endif()
 
 include(GNUInstallDirs)
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+# Keep optional headers available without exposing them on the default include path.
+install(DIRECTORY interop/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/small_gicp_interop)
 
 if(BUILD_HELPER)
   install(TARGETS small_gicp
@@ -320,6 +327,7 @@ if(BUILD_HELPER)
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/small_gicp-config.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/small_gicp-config.cmake"
     INSTALL_DESTINATION ${CMAKE_CONFIG_INSTALL_DIR}
+    PATH_VARS CMAKE_INSTALL_INCLUDEDIR
   )
   write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/small_gicp-config-version.cmake"
