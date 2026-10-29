@@ -1,62 +1,29 @@
 # Benchmark
 
+The results and plots below are retained upstream benchmarks. They were not
+re-measured for this fork's current native backend and do not establish its
+performance or accuracy. For the native workspace build and validation entry,
+see the [workspace instructions](../../README.md) and this fork's
+[dependency requirements](README.md#dependencies).
+
 ## Dataset
 
 The following benchmark requires the KITTI odometry evaluation dataset. You can download the full dataset (80GB) from [the official dataset page](https://www.cvlibs.net/datasets/kitti/eval_odometry.php) or a part of the dataset (500 frames in 00 sequence, 622MB) from [google drive (KITTI00.tar.gz)](https://drive.google.com/file/d/1h9tARKvX6BwLfc_vfMfdxuP3bSbmgjmd/view?usp=sharing).
 
 Note that because the original KITTI dataset is distributed under the CC BY-NC-SA 3.0 license, the derived dataset (KITTI00.tar.gz) must not be used for commercial purposes.
 
-## Build
+## Current native delivery
 
-```bash
-cd small_gicp
-mkdir build && cd build
-
-cmake .. -DBUILD_WITH_TBB=ON -DBUILD_WITH_PCL=ON -DBUILD_BENCHMARKS=ON
-
-# [optional] Build with Iridescence (visualization)
-git clone https://github.com/koide3/iridescence --recursive
-mkdir iridescence/build && cd iridescence/build
-cmake .. && make -j 
-sudo make install
-
-cmake .. -DBUILD_WITH_IRIDESCENCE=ON
-
-# [optional] Build with fast_gicp
-export FAST_GICP_INCLUDE_DIR=/your/fast_gicp/include
-cmake .. -DBUILD_WITH_FAST_GICP=ON
-
-# Build
-make -j
-
-# Test
-# Show options
-./odometry_benchmark
-
-# USAGE: odometry_benchmark <dataset_path> <output_path> [options]
-# OPTIONS:
-#   --visualize
-#   --num_threads <value> (default: 4)
-#   --num_neighbors <value> (default: 20)
-#   --downsampling_resolution <value> (default: 0.25)
-#   --voxel_resolution <value> (default: 2.0)
-#   --engine <pcl|small_gicp|small_gicp_omp|small_vgicp_omp|small_gicp_tbb|small_vgicp_tbb|small_vgicp_model_tbb|small_gicp_tbb_flow> (default: small_gicp)
-
-# Run odometry benchmark
-./odometry_benchmark /your/kitti/dataset/velodyne /tmp/traj_lidar.txt --visualize --num_threads 16 --engine small_gicp_tbb
-```
+The upstream benchmark executables, comparison adapters and launcher scripts are
+not included in this native-only delivery. Their former build commands do not
+apply. Build and validate the native library using the [README](README.md).
+The following results and assets remain historical publication material.
 
 ## Results
 
 All benchmarks were conducted on the KITTI 00 sequence.
 
 ### Downsampling
-
-```bash
-cd small_gicp/scripts
-./run_downsampling_benchmark.sh /path/to/kitti/velodyne
-python3 plot_downsampling.py
-```
 
 - Single-threaded `small_gicp::voxelgrid_sampling` is about **1.3x faster** than `pcl::VoxelGrid`.
 - Multi-threaded `small_gicp::voxelgrid_sampling_tbb` (6 threads) is about **3.2x faster** than `pcl::VoxelGrid`.
@@ -71,12 +38,6 @@ python3 plot_downsampling.py
 
 ### KdTree construction
 
-```bash
-cd small_gicp/scripts
-./run_kdtree_benchmark.sh /path/to/kitti/velodyne
-python3 plot_kdtree.py
-```
-
 - Multi-threaded implementation (TBB and OMP) can be up to **4x faster** than the single-threaded one (All the implementations are based on nanoflann).
 - ~~The processing speed gets faster as the number of threads increases, but the speed gain is not monotonic sometimes (because of the scheduling algorithm or some CPU(AMD 5995WX)-specific issues?)~~.
 - The new KdTree implementation shows a good scalability thanks to its well balanced task assignment.
@@ -86,15 +47,9 @@ python3 plot_kdtree.py
 
 ### Odometry estimation
 
-```bash
-cd small_gicp/scripts
-./run_odometry_benchmark.sh /path/to/kitti/velodyne
-python3 plot_odometry.py
-```
-
 - Single-thread `small_gicp::GICP` is about **2.4x and 1.9x faster** than `pcl::GICP` and `fast_gicp::GICP`, respectively.
 - `small_gicp::(GICP|VGICP)` shows a better multi-thread scalability compared to `fast_gicp::(GICP|VGICP)`.
-- `small_gicp::GICP` parallelized with [TBB flow graph](src/odometry_benchmark_small_gicp_tbb_flow.cpp) shows an excellent scalability to many-threads situations (**~128 threads**) but with latency degradation.
+- `small_gicp::GICP` parallelized with TBB flow graph implementation shows an excellent scalability to many-threads situations (**~128 threads**) but with latency degradation.
 
 ![odometry_time](docs/assets/odometry_time.png)
 

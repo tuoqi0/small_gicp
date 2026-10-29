@@ -13,10 +13,6 @@
   <depend>libomp-dev</depend>
   <test_depend>robot_core</test_depend>
 
-  <!-- optional -->
-  <!-- Eigen is used by optional Python/PCL adapters and reference programs. -->
-  <!-- <depend>libpcl-all-dev</depend> -->
-  <!-- <depend>tbb</depend> -->
 
   <export>
     <build_type>cmake</build_type>

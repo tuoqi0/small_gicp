@@ -1,6 +1,5 @@
 #include <random>
 #include <algorithm>
-#include <fmt/format.h>
 #include <small_gicp/util/sort_omp.hpp>
 
 #include <robot_core/test/doctest.h>
@@ -41,7 +40,8 @@ TEST_CASE("SortOMP.MergeSortTest") {
     std::vector<int> sorted_omp = data;
     merge_sort_omp(sorted_omp.begin(), sorted_omp.end(), std::less<int>(), 4);
 
-    CHECK_MESSAGE((identical(sorted, sorted_omp)), (fmt::format("i={} N={}", i, data.size())));
+    INFO("i=", i, ", N=", data.size());
+    CHECK(identical(sorted, sorted_omp));
   }
 
   // double
@@ -56,7 +56,8 @@ TEST_CASE("SortOMP.MergeSortTest") {
     std::vector<double> sorted_omp = data;
     merge_sort_omp(sorted_omp.begin(), sorted_omp.end(), std::less<double>(), 4);
 
-    CHECK_MESSAGE((identical(sorted, sorted_omp)), (fmt::format("i={} N={}", i, data.size())));
+    INFO("i=", i, ", N=", data.size());
+    CHECK(identical(sorted, sorted_omp));
   }
 
   // empty
@@ -83,7 +84,8 @@ TEST_CASE("SortOMP.QuickSortTest") {
     std::vector<int> sorted_omp = data;
     quick_sort_omp(sorted_omp.begin(), sorted_omp.end(), std::less<int>(), 4);
 
-    CHECK_MESSAGE((identical(sorted, sorted_omp)), (fmt::format("i={} N={}", i, data.size())));
+    INFO("i=", i, ", N=", data.size());
+    CHECK(identical(sorted, sorted_omp));
   }
 
   // double
@@ -98,7 +100,8 @@ TEST_CASE("SortOMP.QuickSortTest") {
     std::vector<double> sorted_omp = data;
     quick_sort_omp(sorted_omp.begin(), sorted_omp.end(), std::less<double>(), 4);
 
-    CHECK_MESSAGE((identical(sorted, sorted_omp)), (fmt::format("i={} N={}", i, data.size())));
+    INFO("i=", i, ", N=", data.size());
+    CHECK(identical(sorted, sorted_omp));
   }
 
   // empty

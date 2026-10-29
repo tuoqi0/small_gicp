@@ -1,4 +1,6 @@
-#include <small_gicp/util/eigen.hpp>
+#include <cmath>
+#include <tuple>
+#include <vector>
 #include <robot_core/test/doctest.h>
 #include <small_gicp/registration/optimizer.hpp>
 #include <small_gicp/registration/termination_criteria.hpp>
@@ -34,7 +36,7 @@ void checkOptimizer(Optimizer optimizer) {
       reduction, earth::mantle::math::identityMatrix<double, 4>(), factors, general);
   CHECK(result.converged);
   CHECK(result.num_inliers == 2);
-  CHECK(small_gicp::eigen_transform(result.T_target_source).translation().x() == doctest::Approx(.2).epsilon(1e-6));
+  CHECK(result.T_target_source[0][3] == doctest::Approx(.2).epsilon(1e-6));
   CHECK(result.H[3][3] == 1);
   CHECK(std::isfinite(result.b[3][0]));
 }
@@ -54,7 +56,8 @@ TEST_CASE("native optimizer failure keeps initial pose and reports the attempted
   const auto initial = earth::mantle::math::identityMatrix<double, 4>();
   const auto failed = gn.optimize(0, 0, 0, 0, small_gicp::TerminationCriteria{}, reduction, initial, factors, general);
   CHECK_FALSE(failed.converged);
-  CHECK(small_gicp::eigen_transform(failed.T_target_source).matrix() == small_gicp::eigen_view(initial));
+  for(size_t row=0;row<4;++row)
+    for(size_t col=0;col<4;++col) CHECK(failed.T_target_source[row][col]==initial[row][col]);
   CHECK(failed.iterations == 0);
   CHECK(failed.H[3][3] == 0);
   CHECK(failed.b[3][0] == -.2);
@@ -65,7 +68,8 @@ TEST_CASE("native optimizer failure keeps initial pose and reports the attempted
   lm.max_inner_iterations = 3;
   const auto rejected = lm.optimize(0, 0, 0, 0, small_gicp::TerminationCriteria{}, reduction, initial, factors, general);
   CHECK_FALSE(rejected.converged);
-  CHECK(small_gicp::eigen_transform(rejected.T_target_source).matrix() == small_gicp::eigen_view(initial));
+  for(size_t row=0;row<4;++row)
+    for(size_t col=0;col<4;++col) CHECK(rejected.T_target_source[row][col]==initial[row][col]);
   CHECK(rejected.iterations == 0);
   CHECK(rejected.H[3][3] == -1);
 }

@@ -1,9 +1,7 @@
 #include <random>
 #include <algorithm>
-#include <fmt/format.h>
 #include <small_gicp/util/sort_omp.hpp>
 #include <small_gicp/util/sort_tbb.hpp>
-#include <small_gicp/benchmark/benchmark.hpp>
 
 #include <robot_core/test/doctest.h>
 #include <cmath>
@@ -39,7 +37,8 @@ void test_radix_sort(std::mt19937& mt) {
     std::vector<T> sorted_tbb = data;
     radix_sort_tbb(sorted_tbb.data(), sorted_tbb.data() + sorted_tbb.size(), [](const T x) { return x; });
 
-    CHECK_MESSAGE((identical(sorted, sorted_tbb)), (fmt::format("i={} N={}", i, data.size())));
+    INFO("i=", i, ", N=", data.size());
+    CHECK(identical(sorted, sorted_tbb));
   }
 
   for (int i = 0; i < 20; i++) {
@@ -52,7 +51,8 @@ void test_radix_sort(std::mt19937& mt) {
     std::vector<std::pair<T, std::uint64_t>> sorted_tbb = data;
     radix_sort_tbb(sorted_tbb.data(), sorted_tbb.data() + sorted_tbb.size(), [](const auto& x) -> T { return x.first; });
 
-    CHECK_MESSAGE((identical(sorted, sorted_tbb)), (fmt::format("i={} N={}", i, data.size())));
+    INFO("i=", i, ", N=", data.size());
+    CHECK(identical(sorted, sorted_tbb));
   }
 }
 

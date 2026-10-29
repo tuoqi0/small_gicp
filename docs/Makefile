@@ -1,17 +1,11 @@
 .PHONY: help
 help:
-	@echo "make cpp|py|all"
+	@echo "make cpp|all"
 
 .PHONY: cpp
 cpp:
 	@echo "Building C++ documentation..."
-	doxygen Doxyfile doc_cpp
-
-.PHONY: py
-py:
-	@echo "Building Python documentation..."
-	mkdir -p build && cd build && cmake ../../ -DBUILD_PYTHON_BINDINGS=ON && make -j
-	sphinx-build -b singlehtml . ./doc_py/
+	doxygen Doxyfile
 
 .PHONY: mkdocs
 mkdocs:
@@ -19,7 +13,7 @@ mkdocs:
 	cd .. && mkdocs build
 
 .PHONY: all
-all: cpp py mkdocs
+all: cpp mkdocs
 	@echo "All documentation built."
 
 .PHONY: deploy
