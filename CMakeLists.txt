@@ -18,7 +18,7 @@ option(ENABLE_COVERAGE "Enable native test coverage" OFF)
 set(BUILD_WITH_OPENMP auto CACHE STRING "Build with OpenMP")
 include(CTest)
 
-find_package(slam_math CONFIG REQUIRED)
+find_package(robot_core CONFIG REQUIRED)
 if(BUILD_WITH_OPENMP STREQUAL "auto")
   find_package(OpenMP)
   set(BUILD_WITH_OPENMP ${OpenMP_FOUND})
@@ -62,7 +62,7 @@ if(BUILD_HELPER)
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
   target_link_libraries(small_gicp PUBLIC
-    slam_math::slam_math $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>)
+    robot_core::alg $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>)
 endif()
 
 if(BUILD_TESTING)

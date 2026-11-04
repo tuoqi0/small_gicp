@@ -1,7 +1,7 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
-find_dependency(slam_math CONFIG REQUIRED)
+find_dependency(robot_core CONFIG REQUIRED)
 if(@BUILD_WITH_OPENMP@)
   find_dependency(OpenMP REQUIRED COMPONENTS CXX)
 endif()

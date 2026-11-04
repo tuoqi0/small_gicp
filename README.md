@@ -7,7 +7,7 @@ registration factors, and serial/OpenMP/TBB implementations.
 ## Dependencies
 
 - C++17 compiler and CMake 3.16 or newer.
-- Installed `slam_math` and `robot_core` packages.
+- Installed the `robot_core` package. Its native math and algorithm targets are used directly.
 - OpenMP for parallel helpers and tests.
 - TBB when using the `*_tbb.hpp` interfaces.
 

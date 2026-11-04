@@ -9,7 +9,7 @@
   <license>MIT</license>
 
   <buildtool_depend>cmake</buildtool_depend>
-  <depend>slam_math</depend>
+  <depend>robot_core</depend>
   <depend>libomp-dev</depend>
   <test_depend>robot_core</test_depend>
 
