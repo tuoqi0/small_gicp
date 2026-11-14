@@ -18,10 +18,12 @@ Inside `slam_ws/src/small_gicp`, follow the
 `src/robot_core` submodule and ROS packages together with
 `colcon build --base-paths src`; no separate sibling checkout is needed.
 
-For a standalone build, add the installed math packages to `CMAKE_PREFIX_PATH`:
+For a standalone build, pass the installed `robot_core` prefix explicitly:
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/path/to/install
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_PREFIX_PATH=/path/to/robot_core-install \
+  -DCMAKE_INSTALL_PREFIX=/path/to/small_gicp-install
 cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
 cmake --install build
@@ -86,6 +88,36 @@ cloud and KD-tree. Lower-level `Registration<Factor, Reduction>` templates are
 available for custom factors and correspondence searches. `PointCloud::point(i)`,
 `normal(i)` and `cov(i)` return native storage references; traits return values.
 
+For localization geometry verification, prepare KNN covariance and geometric
+normals with a physical support radius:
+
+```cpp
+#include <small_gicp/registration/registration_preparation.hpp>
+#include <array>
+#include <vector>
+
+std::vector<std::array<float, 3>> coordinates;
+// Fill coordinates with XYZ in metres in one shared frame.
+auto prepared = small_gicp::prepare_registration_cloud(
+  coordinates, 0.25, 20, 4, 1.0);
+```
+
+The five arguments are XYZ coordinates, voxel size in metres, KNN neighbor
+count, covariance/normal worker count, and geometry-normal radius in metres.
+The OMP voxel sampler uses its own default of four workers. XYZ centroids and
+all covariance entries retain float precision in native double buffers. The
+radius normals face the coordinate origin; they are independent of the KNN
+covariance used by GICP. The input coordinates remain unchanged, and empty input
+returns a nonnull empty cloud. Unusable radius neighborhoods retain invalid
+normals; the caller applies its existing geometric acceptance rules. An invalid
+radius leaves the prepared covariance cloud's normal buffers untouched. Backend
+exceptions propagate to the caller.
+
+This API returns the prepared cloud; construct a KD-tree with the existing
+native interfaces when needed. It does not choose a registration transform or
+decide whether a localization result is acceptable. `preprocess_points()` uses
+its own sampling and KNN-normal policy and remains useful for general alignment.
+
 ## Test
 
 ```sh
@@ -94,18 +126,29 @@ ctest --test-dir build --output-on-failure
 
 The suite covers registration, preprocessing, matrix systems, optimizer failures,
 point/flat/voxel storage, ROS point serialization, projection and sorting.
+`registration_preparation_native_test` checks the prepared cloud through actual
+KD-tree lookup and GICP, float centroid/covariance storage, sparse and degenerate
+neighborhoods, independent radius/KNN support, origin-facing normals, input
+immutability and the existing invalid-radius output:
+
+```sh
+ctest --test-dir build --output-on-failure -R '^registration_preparation_native_test$'
+```
 
 To verify an installation from a separate build directory:
 
 ```sh
 cmake -S test/install_consumer -B consumer-build \
-  -DCMAKE_PREFIX_PATH=/path/to/install
+  -DCMAKE_PREFIX_PATH="/path/to/small_gicp-install;/path/to/robot_core-install"
 cmake --build consumer-build --parallel 2
 ctest --test-dir consumer-build --output-on-failure
 ```
 
-The consumer reuses the public helper contract through the installed
-`small_gicp::small_gicp` target.
+The consumer runs `installed_native_helper` and
+`installed_registration_preparation` through the installed
+`small_gicp::small_gicp` target. Both reuse the native test contracts; the test
+input is read from this checkout while all library headers and symbols come
+from the selected installations.
 
 ## Documentation
 

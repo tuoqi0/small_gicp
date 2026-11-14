@@ -57,7 +57,8 @@ endif()
 if(BUILD_HELPER)
   add_library(small_gicp
     src/small_gicp/registration/registration.cpp
-    src/small_gicp/registration/registration_helper.cpp)
+    src/small_gicp/registration/registration_helper.cpp
+    src/small_gicp/registration/registration_preparation.cpp)
   target_include_directories(small_gicp PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
@@ -71,6 +72,7 @@ if(BUILD_TESTING)
   include(${robot_core_DIR}/robot_coreTests.cmake)
   set(NATIVE_TEST_SOURCES
     src/test/helper_native_test.cpp
+    src/test/registration_preparation_native_test.cpp
     src/test/linear_system_native_test.cpp
     src/test/linearization_native_test.cpp
     src/test/projection_native_test.cpp
