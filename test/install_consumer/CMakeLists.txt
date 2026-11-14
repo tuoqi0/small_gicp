@@ -23,3 +23,12 @@ target_link_libraries(installed_loop_registration small_gicp::small_gicp)
 set_tests_properties(installed_loop_registration PROPERTIES
   RUN_SERIAL TRUE TIMEOUT 90
   ENVIRONMENT "OMP_NUM_THREADS=1;OMP_THREAD_LIMIT=1;OPENBLAS_NUM_THREADS=1;LD_LIBRARY_PATH=$<TARGET_FILE_DIR:small_gicp::small_gicp>:$ENV{LD_LIBRARY_PATH}")
+
+if(UNIX)
+  robot_core_add_test(installed_self_fit_tool ../../src/test/self_fit_tool_native_test.cpp)
+  target_link_libraries(installed_self_fit_tool robot_core::alg)
+  target_compile_definitions(installed_self_fit_tool PRIVATE
+    SELF_FIT_TOOL_PATH="$<TARGET_FILE:small_gicp::sc_self_fit>")
+  set_tests_properties(installed_self_fit_tool PROPERTIES
+    ENVIRONMENT "OMP_NUM_THREADS=2;OMP_THREAD_LIMIT=2")
+endif()

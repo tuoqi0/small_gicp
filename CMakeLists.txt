@@ -11,12 +11,13 @@ endif()
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(CMAKE_POSITION_INDEPENDENT_CODE "Generate position-independent code" ON)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
-option(BUILD_HELPER "Build the native registration helper library" ON)
+option(BUILD_HELPER "Build the native registration helper library and offline tools" ON)
 option(BUILD_WITH_TBB "Enable native TBB headers and their tests" OFF)
 option(BUILD_WITH_MARCH_NATIVE "Build with -march=native" OFF)
 option(ENABLE_COVERAGE "Enable native test coverage" OFF)
 set(BUILD_WITH_OPENMP auto CACHE STRING "Build with OpenMP")
 include(CTest)
+include(GNUInstallDirs)
 
 find_package(robot_core CONFIG REQUIRED)
 if(BUILD_WITH_OPENMP STREQUAL "auto")
@@ -65,6 +66,22 @@ if(BUILD_HELPER)
     $<INSTALL_INTERFACE:include>)
   target_link_libraries(small_gicp PUBLIC
     robot_core::alg $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>)
+
+  add_executable(sc_self_fit tools/sc_self_fit.cpp)
+  target_compile_features(sc_self_fit PRIVATE cxx_std_17)
+  target_link_libraries(sc_self_fit PRIVATE
+    OpenMP::OpenMP_CXX small_gicp robot_core::alg)
+  file(RELATIVE_PATH _sc_self_fit_library_relative
+    "${CMAKE_INSTALL_FULL_BINDIR}" "${CMAKE_INSTALL_FULL_LIBDIR}")
+  if(APPLE)
+    set(_sc_self_fit_origin "@loader_path")
+  else()
+    set(_sc_self_fit_origin "$ORIGIN")
+  endif()
+  set_target_properties(sc_self_fit PROPERTIES
+    BUILD_RPATH_USE_ORIGIN TRUE
+    INSTALL_RPATH "${_sc_self_fit_origin}/${_sc_self_fit_library_relative}"
+    INSTALL_RPATH_USE_LINK_PATH FALSE)
 endif()
 
 if(BUILD_TESTING)
@@ -102,12 +119,20 @@ if(BUILD_TESTING)
   set_tests_properties(loop_registration_native_test PROPERTIES
     RUN_SERIAL TRUE TIMEOUT 90
     ENVIRONMENT "OMP_NUM_THREADS=1;OMP_THREAD_LIMIT=1;OPENBLAS_NUM_THREADS=1;LD_LIBRARY_PATH=$<TARGET_FILE_DIR:small_gicp>:$ENV{LD_LIBRARY_PATH}")
+  if(UNIX)
+    robot_core_add_test(self_fit_tool_native_test src/test/self_fit_tool_native_test.cpp)
+    target_link_libraries(self_fit_tool_native_test robot_core::alg)
+    target_compile_definitions(self_fit_tool_native_test PRIVATE
+      SELF_FIT_TOOL_PATH="$<TARGET_FILE:sc_self_fit>")
+    add_dependencies(self_fit_tool_native_test sc_self_fit)
+    set_tests_properties(self_fit_tool_native_test PROPERTIES
+      ENVIRONMENT "OMP_NUM_THREADS=2;OMP_THREAD_LIMIT=2")
+  endif()
 endif()
 
-include(GNUInstallDirs)
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 if(BUILD_HELPER)
-  install(TARGETS small_gicp EXPORT small_gicp-targets
+  install(TARGETS small_gicp sc_self_fit EXPORT small_gicp-targets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

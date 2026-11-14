@@ -29,9 +29,14 @@ ctest --test-dir build --output-on-failure
 cmake --install build
 ```
 
-The helper library is enabled by default. `BUILD_TESTING` controls native tests
-and requires the test headers supplied by `robot_core`. Native TBB tests can be
-built with `-DBUILD_WITH_TBB=ON` when TBB is installed.
+The helper library and `sc_self_fit` executable are enabled by default through
+`BUILD_HELPER`. `BUILD_TESTING=OFF` still builds and installs both production
+targets. With both `BUILD_HELPER=OFF` and `BUILD_TESTING=OFF`, the installation
+contains headers only, without the library, CLI or CMake package exports.
+Enabling tests requires the helper and the test headers supplied by `robot_core`.
+Native TBB tests can be built with `-DBUILD_WITH_TBB=ON` when TBB is installed.
+The installed Core package already requires OpenMP; `BUILD_WITH_OPENMP=OFF`
+does not remove that existing dependency or the CLI's OpenMP target.
 
 ## Use the native API
 
@@ -136,6 +141,66 @@ the requested minimum; if that check fails, the output transform remains
 unchanged. On success the transform maps source to target. Inputs remain
 unchanged and backend exceptions propagate.
 
+## Update Scan Context self-fit
+
+`sc_self_fit` computes each stored keyframe's geometric fit at its recorded pose
+and writes the scores into the existing Scan Context database. It uses native
+Core PCD/SC codecs, prepared small_gicp clouds and Core geometric fit counts;
+it does not optimize the poses. The installed executable is exported as the
+CMake target `small_gicp::sc_self_fit`.
+
+After the standalone install above, back up the database and run the CLI from
+any working directory. A ROS or Python environment is not needed:
+
+```sh
+cp /path/to/map.pcd.sc /path/to/map.pcd.sc.backup
+/path/to/small_gicp-install/bin/sc_self_fit \
+  /path/to/map.pcd /path/to/map.pcd.sc /path/to/map.pcd.scans
+```
+
+The third path is optional and defaults to the second path plus `ans`, so
+`map.pcd.sc` selects `map.pcd.scans`. The files must come from the same map and
+contain the same ordered keyframes. Keel writes the companion clouds when
+`scan_context.keep_scans` is enabled. The tool overwrites only the `.sc` file;
+keep its backup because a failed write is not rolled back atomically. Map PCD
+and companion scans remain inputs. Unusable keyframe clouds retain their
+previous score; the printed processed count distinguishes them from scored
+rows. Read/format errors and invalid leaf settings return exit1, usage returns
+exit2, and successful saving returns exit0. Backend exceptions propagate.
+
+`SF_LEAF` sets the voxel size in metres, with a default of `0.5`:
+
+```sh
+SF_LEAF=0.3 /path/to/small_gicp-install/bin/sc_self_fit \
+  /path/to/map.pcd /path/to/map.pcd.sc
+```
+
+The existing numeric conversion accepts a numeric prefix; the resulting value
+must be finite and positive. Geometry normals use a fixed `1.0 m` radius,
+matching uses a fixed `1.0 m` distance and `30°` normal-angle gate, and source
+normals with `|nz| > 0.7` are excluded. These settings do not read customized
+node YAML. Scores describe the stored map/keyframe geometry and do not establish
+relocalization accuracy for other online settings.
+
+The native installation uses a relative runtime library path from its configured
+binary directory to its configured library directory (`bin` to `lib` by default).
+Keep those directories together when moving an installation. In a ROS workspace,
+the relocalization package installs the same ELF at its libexec path:
+
+```sh
+source /opt/ros/jazzy/setup.bash
+source /path/to/slam_ws/install/setup.bash
+ros2 run small_gicp_relocalization sc_self_fit \
+  /path/to/map.pcd /path/to/map.pcd.sc /path/to/map.pcd.scans
+```
+
+Source the workspace setup so the relocated ROS command finds the installed
+small_gicp library. For manually separated prefixes, source ROS and the ROS
+package setup, then prepend the actual native library directory, for example
+`export LD_LIBRARY_PATH="/path/to/small_gicp-install/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"`.
+Use the configured library directory if it differs from `lib`. The ROS copy
+has the same contents as the native executable and is not a second build.
+
 ## Test
 
 ```sh
@@ -162,6 +227,15 @@ caller's OMP worker setting:
 ctest --test-dir build --output-on-failure -R '^loop_registration_native_test$'
 ```
 
+On POSIX systems, `self_fit_tool_native_test` runs the actual CLI against
+written PCD, SC and companion-cloud fixtures. It covers matching, nonmatching,
+partly supported and unusable clouds, database metadata, invalid `SF_LEAF` values
+and truncated companion files:
+
+```sh
+ctest --test-dir build --output-on-failure -R '^self_fit_tool_native_test$'
+```
+
 To verify an installation from a separate build directory:
 
 ```sh
@@ -175,7 +249,9 @@ The consumer runs `installed_native_helper`,
 `installed_registration_preparation` and `installed_loop_registration` through
 the installed `small_gicp::small_gicp` target. They reuse the native test contracts; the test
 input is read from this checkout while all library headers and symbols come
-from the selected installations.
+from the selected installations. On POSIX systems, `installed_self_fit_tool`
+runs the same CLI contract through the exported installed executable target,
+without linking or compiling another copy of the tool.
 
 ## Documentation
 
