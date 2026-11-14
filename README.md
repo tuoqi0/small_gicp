@@ -203,6 +203,9 @@ has the same contents as the native executable and is not a second build.
 
 ## Test
 
+Library implementations are in `src/`; native contracts are in `utests/`.
+The separate installed-package consumer is in `utests/install_consumer/`.
+
 ```sh
 ctest --test-dir build --output-on-failure
 ```
@@ -239,7 +242,7 @@ ctest --test-dir build --output-on-failure -R '^self_fit_tool_native_test$'
 To verify an installation from a separate build directory:
 
 ```sh
-cmake -S test/install_consumer -B consumer-build \
+cmake -S utests/install_consumer -B consumer-build \
   -DCMAKE_PREFIX_PATH="/path/to/small_gicp-install;/path/to/robot_core-install"
 cmake --build consumer-build --parallel 2
 ctest --test-dir consumer-build --output-on-failure

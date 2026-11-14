@@ -57,10 +57,9 @@ if(BUILD_TESTING)
 endif()
 if(BUILD_HELPER)
   add_library(small_gicp
-    src/small_gicp/registration/registration.cpp
-    src/small_gicp/registration/registration_helper.cpp
-    src/small_gicp/registration/registration_preparation.cpp
-    src/small_gicp/registration/loop_registration.cpp)
+    src/registration_helper.cpp
+    src/registration_preparation.cpp
+    src/loop_registration.cpp)
   target_include_directories(small_gicp PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
@@ -89,22 +88,22 @@ if(BUILD_TESTING)
   find_package(OpenMP REQUIRED COMPONENTS CXX)
   include(${robot_core_DIR}/robot_coreTests.cmake)
   set(NATIVE_TEST_SOURCES
-    src/test/helper_native_test.cpp
-    src/test/registration_preparation_native_test.cpp
-    src/test/loop_registration_native_test.cpp
-    src/test/linear_system_native_test.cpp
-    src/test/linearization_native_test.cpp
-    src/test/projection_native_test.cpp
-    src/test/registration_native_test.cpp
-    src/test/point_storage_native_test.cpp
-    src/test/flat_container_native_test.cpp
-    src/test/ros_storage_native_test.cpp
-    src/test/optimizer_system_test.cpp
-    src/test/gaussian_voxel_native_test.cpp
-    src/test/sort_omp_test.cpp
-    src/test/vector_test.cpp)
+    utests/helper_native_test.cpp
+    utests/registration_preparation_native_test.cpp
+    utests/loop_registration_native_test.cpp
+    utests/linear_system_native_test.cpp
+    utests/linearization_native_test.cpp
+    utests/projection_native_test.cpp
+    utests/registration_native_test.cpp
+    utests/point_storage_native_test.cpp
+    utests/flat_container_native_test.cpp
+    utests/ros_storage_native_test.cpp
+    utests/optimizer_system_test.cpp
+    utests/gaussian_voxel_native_test.cpp
+    utests/sort_omp_test.cpp
+    utests/vector_test.cpp)
   if(BUILD_WITH_TBB)
-    list(APPEND NATIVE_TEST_SOURCES src/test/sort_tbb_test.cpp)
+    list(APPEND NATIVE_TEST_SOURCES utests/sort_tbb_test.cpp)
   endif()
   foreach(TEST_SOURCE IN LISTS NATIVE_TEST_SOURCES)
     get_filename_component(TEST_NAME ${TEST_SOURCE} NAME_WE)
@@ -120,7 +119,7 @@ if(BUILD_TESTING)
     RUN_SERIAL TRUE TIMEOUT 90
     ENVIRONMENT "OMP_NUM_THREADS=1;OMP_THREAD_LIMIT=1;OPENBLAS_NUM_THREADS=1;LD_LIBRARY_PATH=$<TARGET_FILE_DIR:small_gicp>:$ENV{LD_LIBRARY_PATH}")
   if(UNIX)
-    robot_core_add_test(self_fit_tool_native_test src/test/self_fit_tool_native_test.cpp)
+    robot_core_add_test(self_fit_tool_native_test utests/self_fit_tool_native_test.cpp)
     target_link_libraries(self_fit_tool_native_test robot_core::alg)
     target_compile_definitions(self_fit_tool_native_test PRIVATE
       SELF_FIT_TOOL_PATH="$<TARGET_FILE:sc_self_fit>")
