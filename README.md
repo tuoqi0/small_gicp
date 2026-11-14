@@ -118,6 +118,24 @@ native interfaces when needed. It does not choose a registration transform or
 decide whether a localization result is acceptable. `preprocess_points()` uses
 its own sampling and KNN-normal policy and remains useful for general alignment.
 
+For loop-closure GICP, include
+`<small_gicp/registration/loop_registration.hpp>` and call
+`small_gicp::register_loop_gicp(source, target, guess, voxel, neighbors, threads,
+max_correspondence_distance, max_iterations, minimum_inlier_ratio, output,
+inlier_ratio)`. Source and target are `robot_core` native `PointCloudXYZI::Ptr`
+clouds; the float 4×4 transforms use
+`earth::mantle::alg::loop_closure::RegistrationTransform` from
+`<alg/loop_registration_types.h>`. Link `small_gicp::small_gicp`; this entry point
+does not require the loop-closure backend or ROS.
+
+Voxel size and maximum correspondence distance are in metres. The sampler uses
+the OMP path even with one worker, and the acceptance ratio uses the sampled
+source count. Empty input or a nonconverged solve returns `false` without
+changing either output. A converged solve writes `inlier_ratio` before checking
+the requested minimum; if that check fails, the output transform remains
+unchanged. On success the transform maps source to target. Inputs remain
+unchanged and backend exceptions propagate.
+
 ## Test
 
 ```sh
@@ -135,6 +153,15 @@ immutability and the existing invalid-radius output:
 ctest --test-dir build --output-on-failure -R '^registration_preparation_native_test$'
 ```
 
+`loop_registration_native_test` calls the loop GICP entry point with real native
+clouds. It checks acceptance at exactly 50% support, rejection just above that
+boundary, nonconvergence, output preservation, unchanged input payload and the
+caller's OMP worker setting:
+
+```sh
+ctest --test-dir build --output-on-failure -R '^loop_registration_native_test$'
+```
+
 To verify an installation from a separate build directory:
 
 ```sh
@@ -144,9 +171,9 @@ cmake --build consumer-build --parallel 2
 ctest --test-dir consumer-build --output-on-failure
 ```
 
-The consumer runs `installed_native_helper` and
-`installed_registration_preparation` through the installed
-`small_gicp::small_gicp` target. Both reuse the native test contracts; the test
+The consumer runs `installed_native_helper`,
+`installed_registration_preparation` and `installed_loop_registration` through
+the installed `small_gicp::small_gicp` target. They reuse the native test contracts; the test
 input is read from this checkout while all library headers and symbols come
 from the selected installations.
 

@@ -58,7 +58,8 @@ if(BUILD_HELPER)
   add_library(small_gicp
     src/small_gicp/registration/registration.cpp
     src/small_gicp/registration/registration_helper.cpp
-    src/small_gicp/registration/registration_preparation.cpp)
+    src/small_gicp/registration/registration_preparation.cpp
+    src/small_gicp/registration/loop_registration.cpp)
   target_include_directories(small_gicp PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
@@ -73,6 +74,7 @@ if(BUILD_TESTING)
   set(NATIVE_TEST_SOURCES
     src/test/helper_native_test.cpp
     src/test/registration_preparation_native_test.cpp
+    src/test/loop_registration_native_test.cpp
     src/test/linear_system_native_test.cpp
     src/test/linearization_native_test.cpp
     src/test/projection_native_test.cpp
@@ -97,6 +99,9 @@ if(BUILD_TESTING)
     set_tests_properties(${TEST_NAME} PROPERTIES
       ENVIRONMENT "OMP_NUM_THREADS=2;OMP_THREAD_LIMIT=2;LD_LIBRARY_PATH=$<TARGET_FILE_DIR:small_gicp>:$ENV{LD_LIBRARY_PATH}")
   endforeach()
+  set_tests_properties(loop_registration_native_test PROPERTIES
+    RUN_SERIAL TRUE TIMEOUT 90
+    ENVIRONMENT "OMP_NUM_THREADS=1;OMP_THREAD_LIMIT=1;OPENBLAS_NUM_THREADS=1;LD_LIBRARY_PATH=$<TARGET_FILE_DIR:small_gicp>:$ENV{LD_LIBRARY_PATH}")
 endif()
 
 include(GNUInstallDirs)
