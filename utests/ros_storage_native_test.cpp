@@ -57,3 +57,33 @@ TEST_CASE("PointCloud2 native storage conversion still skips invalid points and 
   checkPoint(decoded->point(0),input.point(1));
   CHECK(small_gicp::detail::from_impl<Message,Field>(Message{})->empty());
 }
+
+namespace {
+void put_le(std::vector<uint8_t>& data, size_t at, float value) {
+  std::memcpy(data.data()+at, &value, sizeof(value));
+}
+void put_be(std::vector<uint8_t>& data, size_t at, float value) {
+  uint8_t b[sizeof(value)]; std::memcpy(b, &value, sizeof(value));
+  for (size_t i=0;i<sizeof(value);++i) data[at+i]=b[sizeof(value)-1-i];
+}
+Message organized() {
+  Message m; m.width=2; m.height=2; m.point_step=16; m.row_step=40; m.data.assign(80,0xa5);
+  m.fields={{"x",0,1,Field::FLOAT32},{"y",4,1,Field::FLOAT32},{"z",8,1,Field::FLOAT32}};
+  for(size_t row=0;row<2;++row) for(size_t col=0;col<2;++col) {
+    size_t at=row*m.row_step+col*m.point_step; put_le(m.data,at+0,float(1+row*2+col)); put_le(m.data,at+4,float(2)); put_le(m.data,at+8,float(3));
+  }
+  return m;
+}
+}
+TEST_CASE("PointCloud2 parser honors organized row padding") {
+  auto m=organized(); auto decoded=small_gicp::detail::from_impl<Message,Field>(m);
+  REQUIRE(decoded->size()==4); CHECK(decoded->point(2)[0][0]==3); CHECK(decoded->point(3)[0][0]==4);
+}
+TEST_CASE("PointCloud2 parser decodes big endian and rejects malformed layouts") {
+  Message m; m.width=1; m.height=1; m.point_step=12; m.row_step=12; m.is_bigendian=true; m.data.assign(12,0);
+  m.fields={{"x",0,1,Field::FLOAT32},{"y",4,1,Field::FLOAT32},{"z",8,1,Field::FLOAT32}};
+  put_be(m.data,0,1.25f); put_be(m.data,4,-2.5f); put_be(m.data,8,3.75f);
+  auto decoded=small_gicp::detail::from_impl<Message,Field>(m); REQUIRE(decoded->size()==1);
+  CHECK(decoded->point(0)[0][0]==1.25); CHECK(decoded->point(0)[1][0]==-2.5); CHECK(decoded->point(0)[2][0]==3.75);
+  for(int damage=0; damage<4; ++damage) { auto bad=m; if(damage==0) bad.fields[0].datatype=1; if(damage==1) bad.fields[0].count=2; if(damage==2) bad.row_step=8; if(damage==3) bad.data.resize(11); CHECK(small_gicp::detail::from_impl<Message,Field>(bad)->empty()); }
+}
