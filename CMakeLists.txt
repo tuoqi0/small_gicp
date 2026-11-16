@@ -33,23 +33,9 @@ target_include_directories(small_gicp PUBLIC
   $<INSTALL_INTERFACE:include>)
 target_link_libraries(small_gicp PUBLIC robot_core::alg OpenMP::OpenMP_CXX)
 
-add_executable(sc_self_fit tools/sc_self_fit.cpp)
-target_compile_features(sc_self_fit PRIVATE cxx_std_17)
-target_link_libraries(sc_self_fit PRIVATE OpenMP::OpenMP_CXX small_gicp robot_core::alg)
-file(RELATIVE_PATH _sc_self_fit_library_relative
-  "${CMAKE_INSTALL_FULL_BINDIR}" "${CMAKE_INSTALL_FULL_LIBDIR}")
-if(APPLE)
-  set(_sc_self_fit_origin "@loader_path")
-else()
-  set(_sc_self_fit_origin "$ORIGIN")
-endif()
-set_target_properties(sc_self_fit PROPERTIES
-  BUILD_RPATH_USE_ORIGIN TRUE
-  INSTALL_RPATH "${_sc_self_fit_origin}/${_sc_self_fit_library_relative}"
-  INSTALL_RPATH_USE_LINK_PATH FALSE)
 
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(TARGETS small_gicp sc_self_fit EXPORT small_gicp-targets
+install(TARGETS small_gicp EXPORT small_gicp-targets
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
