@@ -2,9 +2,7 @@
 
 include(CMakeFindDependencyMacro)
 find_dependency(robot_core CONFIG REQUIRED)
-if(@BUILD_WITH_OPENMP@)
-  find_dependency(OpenMP REQUIRED COMPONENTS CXX)
-endif()
+find_dependency(OpenMP REQUIRED COMPONENTS CXX)
 if(small_gicp_FIND_COMPONENTS)
   set(small_gicp_FOUND FALSE)
   set(small_gicp_NOT_FOUND_MESSAGE "This package exports native small_gicp::small_gicp and small_gicp::sc_self_fit targets; components are not supported.")

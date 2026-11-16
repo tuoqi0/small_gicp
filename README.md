@@ -2,14 +2,13 @@
 
 C++17 point-cloud registration with ICP, point-to-plane ICP, GICP and VGICP.
 The library provides native point storage, KD-tree and voxel maps, preprocessing,
-registration factors, and serial/OpenMP/TBB implementations.
+registration factors, and serial/OpenMP implementations.
 
 ## Dependencies
 
 - C++17 compiler and CMake 3.16 or newer.
 - Installed the `robot_core` package. Its native math and algorithm targets are used directly.
-- OpenMP for parallel helpers and tests.
-- TBB when using the `*_tbb.hpp` interfaces.
+- OpenMP for the production registration and self-fit targets.
 
 ## Build
 
@@ -21,22 +20,12 @@ Inside `slam_ws/src/small_gicp`, follow the
 For a standalone build, pass the installed `robot_core` prefix explicitly:
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_PREFIX_PATH=/path/to/robot_core-install \
-  -DCMAKE_INSTALL_PREFIX=/path/to/small_gicp-install
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/path/to/robot_core-install -DCMAKE_INSTALL_PREFIX=/path/to/small_gicp-install
 cmake --build build --parallel 2
-ctest --test-dir build --output-on-failure
 cmake --install build
 ```
 
-The helper library and `sc_self_fit` executable are enabled by default through
-`BUILD_HELPER`. `BUILD_TESTING=OFF` still builds and installs both production
-targets. With both `BUILD_HELPER=OFF` and `BUILD_TESTING=OFF`, the installation
-contains headers only, without the library, CLI or CMake package exports.
-Enabling tests requires the helper and the test headers supplied by `robot_core`.
-Native TBB tests can be built with `-DBUILD_WITH_TBB=ON` when TBB is installed.
-The installed Core package already requires OpenMP; `BUILD_WITH_OPENMP=OFF`
-does not remove that existing dependency or the CLI's OpenMP target.
+The package always builds the production library and `sc_self_fit` executable with OpenMP; no test or backend switch is required.
 
 ## Use the native API
 
@@ -201,39 +190,5 @@ package setup, then prepend the actual native library directory, for example
 Use the configured library directory if it differs from `lib`. The ROS copy
 has the same contents as the native executable and is not a second build.
 
-## Test
-
-Library implementations are in `src/`; native contracts are in `utests/`.
-
-```sh
-ctest --test-dir build --output-on-failure
-```
-
-The suite covers registration, preprocessing, matrix systems, optimizer failures,
-point/flat/voxel storage, ROS point serialization, projection and sorting.
-`registration_preparation_native_test` checks the prepared cloud through actual
-KD-tree lookup and GICP, float centroid/covariance storage, sparse and degenerate
-neighborhoods, independent radius/KNN support, origin-facing normals, input
-immutability and the existing invalid-radius output:
-
-```sh
-ctest --test-dir build --output-on-failure -R '^registration_preparation_native_test$'
-```
-
-`loop_registration_native_test` calls the loop GICP entry point with real native
-clouds. It checks acceptance at exactly 50% support, rejection just above that
-boundary, nonconvergence, output preservation, unchanged input payload and the
-caller's OMP worker setting:
-
-```sh
-ctest --test-dir build --output-on-failure -R '^loop_registration_native_test$'
-```
-
-On POSIX systems, `self_fit_tool_native_test` runs the actual CLI against
-written PCD, SC and companion-cloud fixtures. It covers matching, nonmatching,
-partly supported and unusable clouds, database metadata, invalid `SF_LEAF` values
-and truncated companion files:
-
-```sh
-ctest --test-dir build --output-on-failure -R '^self_fit_tool_native_test$'
-```
+## 验证
+生产配准通过 small_gicp_relocalization 与 Keel 的 ROS 链路验证；本包只构建并安装注册库和 sc_self_fit。
