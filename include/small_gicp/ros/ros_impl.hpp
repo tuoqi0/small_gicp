@@ -1,6 +1,3 @@
-// SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
-// SPDX-FileCopyrightText: Copyright 2025 Ikhyeon Cho
-// SPDX-License-Identifier: MIT
 #pragma once
 
 #include <algorithm>

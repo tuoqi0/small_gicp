@@ -204,7 +204,6 @@ has the same contents as the native executable and is not a second build.
 ## Test
 
 Library implementations are in `src/`; native contracts are in `utests/`.
-The separate installed-package consumer is in `utests/install_consumer/`.
 
 ```sh
 ctest --test-dir build --output-on-failure
@@ -238,50 +237,3 @@ and truncated companion files:
 ```sh
 ctest --test-dir build --output-on-failure -R '^self_fit_tool_native_test$'
 ```
-
-To verify an installation from a separate build directory:
-
-```sh
-cmake -S utests/install_consumer -B consumer-build \
-  -DCMAKE_PREFIX_PATH="/path/to/small_gicp-install;/path/to/robot_core-install"
-cmake --build consumer-build --parallel 2
-ctest --test-dir consumer-build --output-on-failure
-```
-
-The consumer runs `installed_native_helper`,
-`installed_registration_preparation` and `installed_loop_registration` through
-the installed `small_gicp::small_gicp` target. They reuse the native test contracts; the test
-input is read from this checkout while all library headers and symbols come
-from the selected installations. On POSIX systems, `installed_self_fit_tool`
-runs the same CLI contract through the exported installed executable target,
-without linking or compiling another copy of the tool.
-
-## Documentation
-
-See the [C++ documentation index](docs/index.md). The [paper](docs/paper.md) and
-[historical benchmark results](BENCHMARK.md) describe the upstream publication.
-
-## License
-This package is released under the MIT license.
-
-If you find this package useful for your project, please consider leaving a comment [here](https://github.com/koide3/small_gicp/issues/3). It would help the author receive recognition in his organization and keep working on this project.
-
-Please also cite [the following article](https://joss.theoj.org/papers/10.21105/joss.06948) if you use this software in an academic work.
-
-```
-@article{small_gicp,
-author = {Kenji Koide},
-title = {{small\_gicp: Efficient and parallel algorithms for point cloud registration}},
-journal = {Journal of Open Source Software},
-month = aug,
-number = {100},
-pages = {6948},
-volume = {9},
-year = {2024},
-doi = {10.21105/joss.06948}
-}
-```
-
-## Contact
-
-[Kenji Koide](https://staff.aist.go.jp/k.koide/), National Institute of Advanced Industrial Science and Technology (AIST)

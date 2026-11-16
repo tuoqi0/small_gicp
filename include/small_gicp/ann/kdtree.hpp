@@ -1,5 +1,3 @@
-// SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
-// SPDX-License-Identifier: MIT
 
 // While the following KdTree code is written from scratch, it is heavily inspired by the nanoflann library.
 // Thus, the following original license of nanoflann is included to be sure.
