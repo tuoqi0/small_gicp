@@ -19,9 +19,8 @@ bool register_loop_gicp(
   float max_corr_dist, int max_iterations, float min_inlier_ratio,
   RegistrationTransform & out, float & inlier_ratio)
 {
-  // Judged by num_inliers rather than a fitness score, which read 0.12 for a 3 m
-  // misalignment along a repeating road. With PCL's ICP, 24% of accepted
-  // closures were more than 1 m from truth.
+  // Use the inlier ratio rather than a standalone fitness score: repeated
+  // geometry can make a large misalignment look numerically inexpensive.
   if (!src || !tgt || src->empty() || tgt->empty()) return false;
 
   auto toNative = [](const PointCloudXYZI & in) {

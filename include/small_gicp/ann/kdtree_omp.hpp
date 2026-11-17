@@ -3,11 +3,6 @@
 #include <atomic>
 #include <small_gicp/ann/kdtree.hpp>
 
-#ifdef _MSC_VER
-#pragma message("warning: Task-based OpenMP parallelism causes run-time memory errors with Eigen matrices.")
-#pragma message("warning: Thus, OpenMP-based multi-threading for KdTree construction is disabled on MSVC.")
-#endif
-
 namespace small_gicp {
 
 /// @brief Kd-tree builder with OpenMP.

@@ -7,8 +7,8 @@
 
 namespace small_gicp { namespace detail {
 
-// Eigen's original LDLT reads the lower triangle. Accumulation can leave the
-// two triangles slightly different; preserve that convention and -gradient.
+// Accumulation can leave the two triangles slightly different; use the lower
+// triangle consistently and preserve the negative-gradient convention.
 inline bool solve_damped_system(const factor_detail::Hessian& hessian,
                                 const factor_detail::Gradient& gradient,
                                 double damping, factor_detail::Gradient& delta) {
