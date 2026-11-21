@@ -2,10 +2,6 @@ targets:
   small_gicp:
     kind: shared
     std: gnu++17
-    sources:
-      - src/registration_helper.cpp
-      - src/registration_preparation.cpp
-      - src/loop_registration.cpp
     public_include_dirs:
       - include
     deps:
