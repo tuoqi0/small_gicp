@@ -1,0 +1,28 @@
+members: [..]
+default: [small_gicp]
+paths:
+  ROBOT_CORE_PREFIX: ../robot_core-install
+profiles:
+  minsizerel:
+    optimization: s
+  relwithdebinfo:
+    optimization: '2'
+    debug_info: true
+targets:
+  robot_core_alg:
+    kind: interface
+    public_include_dirs:
+      - '{path:ROBOT_CORE_PREFIX}/include'
+    link_inputs:
+      - '{path:ROBOT_CORE_PREFIX}/lib/librobot_core_alg.a'
+      - '{path:ROBOT_CORE_PREFIX}/lib/librobot_core_math.a'
+      - '{path:ROBOT_CORE_PREFIX}/lib/librobot_core_system_runtime.a'
+    link_options:
+      - -pthread
+  robot_core_package:
+    kind: interface
+    deps: [robot_core_alg]
+  openmp_runtime:
+    kind: interface
+    link_options:
+      - -fopenmp

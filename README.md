@@ -6,26 +6,30 @@ registration factors, and serial/OpenMP implementations.
 
 ## Dependencies
 
-- C++17 compiler and CMake 3.16 or newer.
-- Installed the `robot_core` package. Its native math and algorithm targets are used directly.
+- RC and a C++17 compiler.
+- The `robot_core` native math and algorithm targets. Standalone builds use an
+  installed Core SDK with headers under `include/` and static libraries under `lib/`.
 - OpenMP for the production registration library.
 
 ## Build
 
-Inside `slam_ws/src/small_gicp`, follow the
-[workspace build instructions](../../README.md). The workspace builds the pinned
-`src/robot_core` submodule and ROS packages together with
-`colcon build --base-paths src`; no separate sibling checkout is needed.
+Inside `slam_ws/src/small_gicp`, run `rc build` to build against the pinned
+Core source in the workspace. See the [workspace instructions](../../README.md)
+for installing RC.
 
-For a standalone build, pass the installed `robot_core` prefix explicitly:
+For a standalone Linux build, point RC to an installed Core SDK.
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/path/to/robot_core-install -DCMAKE_INSTALL_PREFIX=/path/to/small_gicp-install
-cmake --build build --parallel 2
-cmake --install build
+export ROBOT_CORE_PREFIX=/path/to/robot_core-install
+rc --workspace standalone install -j2 --prefix /path/to/small_gicp-install
 ```
 
-The package builds the production registration library with OpenMP; no test or backend switch is required.
+The default is a shared registration library with OpenMP. To build a static
+library, add `--features small_gicp:static` before `install` and use a separate
+`--output` build directory and install prefix. Add
+`--features small_gicp:native` to compile for the local CPU. Use
+`--profile debug`, `--profile minsizerel` or `--profile relwithdebinfo` to
+select an alternate standalone build profile.
 
 ## Use the native API
 
@@ -74,8 +78,8 @@ target_link_libraries(register_cloud PRIVATE small_gicp::small_gicp)
 target_compile_features(register_cloud PRIVATE cxx_std_17)
 ```
 
-Set `CMAKE_PREFIX_PATH` to the installation prefix when configuring the consumer.
-No source-tree include paths are needed.
+Set `CMAKE_PREFIX_PATH` to the installed prefix when configuring the consumer.
+If Core and small_gicp were installed separately, include both prefixes.
 
 For repeated registration, use `preprocess_points()` once and reuse the prepared
 cloud and KD-tree. Lower-level `Registration<Factor, Reduction>` templates are

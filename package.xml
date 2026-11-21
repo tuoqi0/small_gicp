@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
-<package format="3">  
+<package format="3">
   <name>small_gicp</name>
   <version>1.0.1</version>
   <description>Efficient and parallelized algorithms for point cloud registration</description>
@@ -8,12 +8,11 @@
   <maintainer email="871609336@qq.com">Qi Tuo</maintainer>
   <license>Proprietary</license>
 
-  <buildtool_depend>cmake</buildtool_depend>
   <depend>robot_core</depend>
   <depend>libomp-dev</depend>
 
 
   <export>
-    <build_type>cmake</build_type>
+    <build_type>rc</build_type>
   </export>
 </package>

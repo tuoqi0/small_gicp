@@ -13,6 +13,12 @@ targets:
       - openmp_runtime
     compile_options:
       - -fopenmp
+    features:
+      static:
+        kind: static
+      native:
+        compile_options:
+          - -march=native
     install: true
     install_deps:
       - robot_core_package
