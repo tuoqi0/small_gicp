@@ -10,3 +10,16 @@ public_include_dirs = ["include"]
 deps = ["robot_core_alg", "openmp_runtime"]
 compile_options = ["-fopenmp"]
 install = true
+install_deps = ["robot_core_package"]
+
+[targets.small_gicp.install_files]
+"cmake/small_gicp-config-version.cmake" = "lib/cmake/small_gicp/small_gicp-config-version.cmake"
+
+[targets.small_gicp.cmake]
+directory = "lib/cmake/small_gicp"
+config = "cmake/small_gicp-config.cmake.in"
+
+[targets.small_gicp.cmake.exports."small_gicp-targets.cmake"."small_gicp::small_gicp"]
+target = "small_gicp"
+include_dirs = ["include"]
+link_libraries = ["robot_core::alg", "OpenMP::OpenMP_CXX"]
