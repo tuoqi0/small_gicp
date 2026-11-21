@@ -7,8 +7,8 @@ registration factors, and serial/OpenMP implementations.
 ## Dependencies
 
 - RC and a C++17 compiler.
-- The `robot_core` native math and algorithm targets. Standalone builds use an
-  installed Core SDK with headers under `include/` and static libraries under `lib/`.
+- The `robot_core` native math and algorithm targets. Standalone builds load
+  `robot_core_alg` and its dependencies from the installed Core SDK's RC exports.
 - OpenMP for the production registration library.
 
 ## Build
@@ -17,10 +17,10 @@ Inside `slam_ws/src/small_gicp`, run `rc build` to build against the pinned
 Core source in the workspace. See the [workspace instructions](../../README.md)
 for installing RC.
 
-For a standalone Linux build, point RC to an installed Core SDK.
+For a standalone Linux build, add the Core SDK installation prefix to RC's SDK search path.
 
 ```sh
-export ROBOT_CORE_PREFIX=/path/to/robot_core-install
+export RC_SDK_PREFIX_PATH=/path/to/robot_core-install
 rc --workspace standalone install -j2 --prefix /path/to/small_gicp-install
 ```
 
