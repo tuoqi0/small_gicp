@@ -31,6 +31,18 @@ library, add `--features small_gicp:static` before `install` and use a separate
 `--profile debug`, `--profile minsizerel` or `--profile relwithdebinfo` to
 select an alternate standalone build profile.
 
+For an independent RC project, add both install prefixes and name the library in
+`rc.yaml`. The exported module provides the OpenMP compile and link options.
+
+```sh
+export RC_SDK_PREFIX_PATH=/path/to/small_gicp-install:/path/to/robot_core-install
+```
+
+```yaml
+module:
+  deps: [{sdk: small_gicp}]
+```
+
 ## Use the native API
 
 The helper accepts standard coordinate arrays. Transforms map source coordinates

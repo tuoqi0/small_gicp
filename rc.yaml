@@ -1,13 +1,14 @@
 targets:
   small_gicp:
     kind: shared
+    sdk_export: true
     std: gnu++17
     public_include_dirs:
       - include
     deps:
       - robot_core_alg
       - openmp_runtime
-    compile_options:
+    public_compile_options:
       - -fopenmp
     features:
       static:
